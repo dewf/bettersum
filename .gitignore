@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/typeparser
+typeparser.so
+typeparser.dylib
+typeparser.dll
+libtypeparser.a
+typeparser.a
+typeparser.lib
+typeparser-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

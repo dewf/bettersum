@@ -1,0 +1,7 @@
+name "typeparser"
+description "A minimal D application."
+authors "Daniel"
+copyright "Copyright © 2026, Daniel"
+license "proprietary"
+
+targetPath "./bin"
