@@ -1,55 +1,70 @@
 import std.stdio;
+import std.format;
 
 import tokenizer;
 
-auto x = q{
-CoolThing(T) {
-	One(int),
-	Two(string x),
-	Three(string x, int y)
-}
-};
+struct ParseResult(T) {
+	bool _success;
+	T thing;
+	Token[] etc;
 
-auto examples = [
-	"int x",
-	"string y",
-	"int[] things",
-	"int[string] mappy",
-	"const(int[]) things",
-	"const(const int[]) things",
-	"foo!(int, string)[] variablename",
-	"const (int delegate(int) pure nothrow[]) variablename",
-	"typeof(foo!(T).bar) variablename",
-	"int function(int, int) pure nothrow @safe variablename",
-	"ref const(Structy!int.Substruct[]) variablename",
-	// "CoolThing
-    //     { One, Two(int x), Three(int),
-    //       Four, Five(int x, int y, int z) }"
-];
+	bool opCast(X : bool)() const {
+		return _success;
+	}
 
-struct Bar(T) {
-	T x;
+	static ParseResult success(T thing, Token[] etc) {
+		return ParseResult!T(true, thing, etc);
+	}
+
+	static ParseResult fail() {
+		return ParseResult!T(false);
+	}
 }
 
-struct Foo(T,Y) {
-	T bar;
-	Y foog;
-	typeof(Bar!(T).x) yack;
+struct DType {
+	enum Tag {
+		Primitive // of string
+	}
+	union Content {
+		string text;
+	}
+	Tag tag;
+	Content content;
+
+	static DType mkPrimitive(string prim) {
+		Content c = { text: prim };
+		return DType(Tag.Primitive, c);
+	}
+
+	string toString() const {
+		final switch (tag) {
+			case Tag.Primitive:
+				return format("Prim:%s", content.text);
+		}
+	}
+}
+alias DTypeParseResult = ParseResult!DType;
+
+DTypeParseResult parseType(Token[] tokens) {
+	if (tokens.length == 0) return DTypeParseResult.fail();
+	if (auto prim = tokens[0].isPrimitive()) {
+		return DTypeParseResult.success(DType.mkPrimitive(*prim), tokens[1..$]);
+	}
+	return DTypeParseResult.fail();
 }
 
 void main()
 {
-	const (int delegate(int) pure nothrow[]) variablename;
-	const(const int[]) things;
-	Foo!(int,string)[] morely;
-	const (int delegate(int)[]) yeargh;
-	typeof(Foo!(int,string).bar) yeargh2;
-	int function(int, int) pure nothrow @safe woot;
-
-	foreach (e; examples) {
-		writefln("==== example { %s } =====", e);
-		foreach (token; tokenize(e)) {
-			writefln("token: %s", token);
+	auto tokens = tokenize("int varname");
+	// foreach (t; tokens) {
+	// 	writefln("token: %s", t);
+	// }
+	// writeln("====================");
+	if (auto res = parseType(tokens)) {
+		writefln("DType: %s", res.thing);
+		writeln("===== remaining tokens =====");
+		foreach (t; res.etc) {
+			writefln(" - %s", t);
 		}
 	}
 }

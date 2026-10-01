@@ -24,7 +24,7 @@ bool alphaNumeric(string input, out string value) {
 }
 
 bool symbol(string input, out string value) {
-	static auto known = aaFromItems!char(['!', '.', ',', '(', ')', '[', ']', '*', '@', '{', '}']);
+	static auto known = setFromItems!char(['!', '.', ',', '(', ')', '[', ']', '*', '@', '{', '}']);
 	if (input.length > 0 && input[0] in known) {
 		value = [input[0]];
 		return true;
