@@ -110,6 +110,23 @@ Token[] classify(Chunk[] chunks) {
 
 public:
 
+struct Location {
+	int line;
+	int col;
+	this(int line, int col) {
+		this.line = line;
+		this.col = col;
+	}
+	this(Chunk ch) {
+		line = ch.line;
+		col = ch.col;
+	}
+	string toString() const {
+		import std.format;
+		return format("[%d:%d]", line, col);
+	}
+}
+
 struct Token {
 	enum Tag {
 		Primitive,
@@ -137,17 +154,22 @@ struct Token {
 	}
 	const Tag tag;
 	Content content;
-	const int line;
-	const int col;
+	Location loc;
 
 	static Token mkSymbol(Symbol symbol, int line, int col) {
 		Content c = { symbol: symbol };
-		return Token(Tag.Symbol, c, line, col);
+		return Token(Tag.Symbol, c, Location(line, col));
+	}
+	const(Symbol)* isSymbol() {
+		if (tag == Tag.Symbol) {
+			return &content.symbol;
+		}
+		return null;
 	}
 
 	static Token mkPrimitive(Chunk ch) {
 		Content c = { text: ch.str };
-		return Token(Tag.Primitive, c, ch.line, ch.col);
+		return Token(Tag.Primitive, c, Location(ch));
 	}
 	const(string)* isPrimitive() {
 		if (tag == Tag.Primitive) {
@@ -158,7 +180,7 @@ struct Token {
 
 	static Token mkKeyword(Chunk ch) {
 		Content c = { text: ch.str };
-		return Token(Tag.Keyword, c, ch.line, ch.col);
+		return Token(Tag.Keyword, c, Location(ch));
 	}
 	const(string)* isKeyword() {
 		if (tag == Tag.Keyword) {
@@ -169,12 +191,24 @@ struct Token {
 
 	static Token mkIdentifier(Chunk ch) {
 		Content c = { text: ch.str };
-		return Token(Tag.Identifier, c, ch.line, ch.col);
+		return Token(Tag.Identifier, c, Location(ch));
+	}
+	const(string)* isIdentifier() {
+		if (tag == Tag.Identifier) {
+			return &content.text;
+		}
+		return null;
 	}
 
 	static Token mkNumeric(Chunk ch) {
 		Content c = { text: ch.str };
-		return Token(Tag.Numeric, c, ch.line, ch.col);
+		return Token(Tag.Numeric, c, Location(ch));
+	}
+	const(string)* isNumeric() {
+		if (tag == Tag.Numeric) {
+			return &content.text;
+		}
+		return null;
 	}
 
 	string toString() const {
@@ -182,15 +216,15 @@ struct Token {
 		import std.conv: to;
 		final switch (tag) {
 			case Tag.Keyword:
-				return format("Keyword(%s)[%d:%d]", content.text, line, col);
+				return format("Keyword(%s)%s", content.text, loc);
 			case Tag.Primitive:
-				return format("Primitive(%s)[%d:%d]", content.text, line, col);
+				return format("Primitive(%s)%s", content.text, loc);
 			case Tag.Identifier:
-				return format("Identifier(%s)[%d:%d]", content.text, line, col);
+				return format("Identifier(%s)%s", content.text, loc);
 			case Tag.Numeric:
-				return format("Numeric(%s)[%d:%d]", content.text, line, col);
+				return format("Numeric(%s)%s", content.text, loc);
 			case Tag.Symbol:
-				return format("Symbol(%s)[%d:%d]", content.symbol.to!string, line, col);
+				return format("Symbol(%s)%s", content.symbol.to!string, loc);
 		}
 	}
 }
