@@ -15,6 +15,10 @@ ParseResult(T) {
 }
 }));
 
+ParseResult!U reraise(U,T)(ParseResult!T original) {
+	return ParseResult!U.makeError(original.error.message, original.error.loc);
+}
+
 T tryToken(T)(Token[] input, int index, T delegate(Token*) func) { // delegate arg must be pointer/ref! otherwise it's a Token copy, and the .isWhatever methods will return pointers to temporary locations! memory corruption galore
 	if (input.length > index) {
 		return func(&input[index]);
@@ -22,11 +26,26 @@ T tryToken(T)(Token[] input, int index, T delegate(Token*) func) { // delegate a
 	return T.init;
 }
 
+
+// TODO: change those of these which can't have errors, to something simpler than ParseResult?
+// maybe SimpleParseResult? or should Fail() have its own payload?
+
 ParseResult!DType parsePrimitive(Token[] tokens) {
 	if (auto prim = tryToken(tokens, 0, t => t.isPrimitive())) {
 		return ParseResult!DType.makeSuccess(new Primitive(*prim), tokens[0].loc, tokens[1..$]);
 	}
 	return ParseResult!DType.makeFail();
+}
+
+ParseResult!string parseOneOfKeywords(Token[] tokens, string[] keywords) {
+	import std.algorithm.searching: canFind;
+	if (auto kw = tryToken(tokens, 0, t => t.isKeyword())) {
+		if (keywords.canFind(*kw)) {
+			return ParseResult!string.makeSuccess(*kw, tokens[0].loc, tokens[1..$]);
+		}
+		// else was some other keyword, no biggie -- fall through to failure
+	}
+	return ParseResult!string.makeFail();
 }
 
 ParseResult!Unit parseSymbol(Token[] tokens, Token.Symbol which) {
@@ -36,6 +55,13 @@ ParseResult!Unit parseSymbol(Token[] tokens, Token.Symbol which) {
 		}
 	}
 	return ParseResult!Unit.makeFail();
+}
+
+ParseResult!string parseIdentifier(Token[] tokens) {
+	if (auto id = tryToken(tokens, 0, t => t.isIdentifier())) {
+		return ParseResult!string.makeSuccess(*id, tokens[0].loc, tokens[1..$]);
+	}
+	return ParseResult!string.makeFail();
 }
 
 ParseResult!string parseNumeric(Token[] tokens) {
@@ -74,8 +100,6 @@ ParseResult!(Token[]) parseBetween(Token[] tokens, Token.Symbol left, Token.Symb
 	return ParseResult!(Token[]).makeFail();
 }
 
-string[][string] wack;
-
 ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 	auto bracketResult = parseBetween(tokens, Token.Symbol.LeftBracket, Token.Symbol.RightBracket);
 	if (auto bracketed = bracketResult.isSuccess()) {
@@ -112,8 +136,8 @@ ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 				return ParseResult!DType.makeError("spurious content after assoc array key type", type.loc);
 			}
 		} else if (auto err = typeResult.isError()) {
-			// raise error - problem parsing nested type
-			return ParseResult!DType.makeError(err.message, err.loc);
+			// re-raise (same type)
+			return typeResult;
 		}
 
 		// unhandled bracketed content
@@ -121,28 +145,204 @@ ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 
 	} else if (auto err = bracketResult.isError()) {
 		// raise bracket errors
-		return ParseResult!DType.makeError(err.message, err.loc);
+		return reraise!DType(bracketResult);
 	}
 
 	// else no worries
 	return ParseResult!DType.makeFail();
 }
 
+ParseResult!(DType[]) parseTypeArguments(Token[] tokens) {
+
+	// required !
+	auto bangResult = parseSymbol(tokens, Token.Symbol.Bang);
+	if (bangResult.isFail()) {
+		// no type args ...
+		return ParseResult!(DType[]).makeFail();
+	} // error not possible for parseSymbol
+
+	// redefine for convenience
+	tokens = bangResult.success.etc;
+
+	// is it a single type?
+	auto singleTypeResult = parseType(tokens, false); // don't follow suffix (for this variant)
+	if (auto single = singleTypeResult.isSuccess()) {
+		return ParseResult!(DType[]).makeSuccess([single.thing], single.loc, single.etc);
+	} else if (auto err = singleTypeResult.isError()) {
+		// re-raise
+		return reraise!(DType[])(singleTypeResult);
+	} // else simple failure - try parenthesized parse instead
+
+	// else is it a parenthesized list?
+	auto parensResult = parseBetween(tokens, Token.Symbol.LeftParen, Token.Symbol.RightParen);
+	if (auto content = parensResult.isSuccess()) {
+		// parse comma-delimited list of types
+		DType[] types;
+		auto input = content.thing;
+		while (input.length > 0) {
+
+			auto typeResult = parseType(input);
+			if (auto type = typeResult.isSuccess()) {
+
+				types ~= type.thing;
+				input = type.etc;
+
+				// parse comma or verify input end and return
+				if (input.length > 0) {
+
+					auto commaResult = parseSymbol(input, Token.Symbol.Comma);
+					if (auto comma = commaResult.isSuccess()) {
+						// excellent!
+						input = comma.etc;
+						continue;
+					} // no errors possible for symbol parsing
+
+					// else whoops
+					return ParseResult!(DType[]).makeError("missing comma in type args list", input[0].loc); // input.length > 0 branch, so should be OK
+
+				} else {
+					// done reading all content - happy exit
+					return ParseResult!(DType[]).makeSuccess(types, type.loc, content.etc); // content.etc = post-parens content
+				}
+
+			} else if (auto err = typeResult.isError()) {
+				// raise type-parsing error
+				return reraise!(DType[])(typeResult);
+			}
+
+			// else it's an error because we failed to parse a type (and didn't continue/exit first)
+			return ParseResult!(DType[]).makeError("parseTypeArguments: failed to parse a type", input[0].loc); // input.length > 0, so should be OK
+		}
+		throw new Exception("parseTypeArguments(): unreachable");
+
+	} else if (auto err = parensResult.isError()) {
+		// raise error (requires conversion)
+		return reraise!(DType[])(parensResult);
+	}
+	// no parens pair, fail gracefully
+	return ParseResult!(DType[]).makeFail();
+}
+
 ParseResult!DType parseFront(Token[] tokens) {
 	// one of:
 
 	// - primitive
-	if (auto prim = tryToken(tokens, 0, t => t.isPrimitive())) {
-		auto dt = new Primitive(*prim);
-		return ParseResult!DType.makeSuccess(dt, tokens[0].loc, tokens[1..$]);
-	}
+	auto primResult = parsePrimitive(tokens);
+	if (auto prim = primResult.isSuccess()) {
+		// pass it through
+		return primResult;
+	} // no errors possible with parsePrimitive
 
 	// - named thing
-	if (auto id = tryToken(tokens, 0, t => t.isIdentifier())) {
-		throw new Exception("parseFront: not yet implemented");
+	auto idResult = parseIdentifier(tokens);
+	if (auto id = idResult.isSuccess()) {
+
+		// what about type arguments?
+		auto argsResult = parseTypeArguments(id.etc);
+		if (auto args = argsResult.isSuccess()) {
+			auto dt = new NamedThing(id.thing, args.thing);
+			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
+
+		} else if (auto err = argsResult.isError()) {
+			// raise error (requires conversion)
+			return reraise!DType(argsResult);
+		}
+
+		// else no type args - no worries
+		auto dt = new NamedThing(id.thing);
+		return ParseResult!DType.makeSuccess(dt, id.loc, id.etc);
 	}
 
-	// else error, didn't find what we needed
+	// else we didn't find what we needed
+	// (outside level will turn this into a true error)
+	return ParseResult!DType.makeFail();
+}
+
+ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
+	auto contentResult = parseBetween(tokens, Token.Symbol.LeftParen, Token.Symbol.RightParen);
+	if (auto content = contentResult.isSuccess()) {
+
+		FunctionArg[] args;
+		auto input = content.thing;
+
+		while (input.length > 0) {
+
+			// parse type (required)
+			auto typeResult = parseType(input);
+			if (auto type = typeResult.isSuccess()) {
+
+				input = type.etc;
+
+				// parse arg name (optional)
+				string argName = null;
+
+				auto nameResult = parseIdentifier(input);
+				if (auto name = nameResult.isSuccess()) {
+					argName = name.thing;
+					input = name.etc;
+				}
+
+				args ~= FunctionArg(type.thing, argName);
+
+				// parse comma or verify input end and return
+				if (input.length > 0) {
+
+					auto commaResult = parseSymbol(input, Token.Symbol.Comma);
+					if (auto comma = commaResult.isSuccess()) {
+						// excellent!
+						input = comma.etc;
+						continue;
+					} // no errors possible for symbol parsing
+
+					// else whoops
+					return ParseResult!(FunctionArg[]).makeError("missing comma in function args list", input[0].loc); // input.length > 0 branch, so should be OK
+
+				} else {
+					// done reading all content - happy exit
+					return ParseResult!(FunctionArg[]).makeSuccess(args, content.loc, content.etc); // content.etc = post-parens content!
+				}
+
+			} else if (auto err = typeResult.isError()) {
+				// type parsing error, re-raise
+				return reraise!(FunctionArg[])(typeResult);
+			}
+
+			// else non-existent - error because it's required
+			return ParseResult!(FunctionArg[]).makeError("parseFunctionArgs: missing type", input[0].loc); // inside of input.length > 0 loop, so input[0].loc should be OK
+		}
+		// else ran out of input - but not in the normal way (needs to find end-of-input in the loop above)
+		throw new Exception("parseFunctionArgs(): should be unreachable");
+
+	} else if (auto err = contentResult.isError()) {
+		// re-raise badness (missing right paren or whatever)
+		reraise!(FunctionArg[])(contentResult);
+	}
+
+	// else no parens (outside will make this an error)
+	return ParseResult!(FunctionArg[]).makeFail();
+}
+
+ParseResult!DType parseCallable(DType returnType, Location loc, Token[] tokens) {
+	auto kwResult = parseOneOfKeywords(tokens, ["function", "delegate"]);
+	if (auto kw = kwResult.isSuccess()) {
+
+		// parse argument list (required!)
+		auto argsResult = parseFunctionArgs(kw.etc);
+		if (auto args = argsResult.isSuccess()) {
+
+			// TODO: parse optional suffixes (pure/nothrow/etc)
+
+			auto dt = new Callable(kw.thing, returnType, args.thing);
+			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
+
+		} else if (auto err = argsResult.isError()) {
+			reraise!DType(argsResult);
+		} // else no args list found
+
+		// ... so it's an error, because the keyword MUST be followed by a parameter list
+		return ParseResult!DType.makeError("parseFuncOrDelegate: must be followed by args list", kw.loc);
+	}
+	// else didn't have a keyword, so not what we want
 	return ParseResult!DType.makeFail();
 }
 
@@ -156,35 +356,47 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens) {
 		return parseTypeSuffix(bracketed.thing, bracketed.loc, bracketed.etc);
 
 	} else if (auto err = bracketedResult.isError()) {
-		// raise error
+		// re-raise error (same type)
 		return bracketedResult;
 	}
 
 	// - 'delegate' / 'function' + (args) + pure/nothrow/@safe/etc
+	// current front is return type
+	auto callableResult = parseCallable(front, loc, tokens);
+	if (auto callable = callableResult.isSuccess()) {
+		// need to recurse to see if there is more of a suffix (this callable might be part of an array, or a return type itself!)
+		return parseTypeSuffix(callable.thing, callable.loc, callable.etc);
+	} else if (auto err = callableResult.isError()) {
+		// re-raise
+		return callableResult;
+	}
 
-	// - none of the above - that's fine, means the type is complete (probably)
+	// - none of the above - that's fine, means the type is finally complete (hopefully)
 	return ParseResult!DType.makeSuccess(front, loc, tokens);
 }
 
-ParseResult!DType parseType(Token[] tokens) {
+ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can disable suffix parsing for single-argument (unparenthesized) type params
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
 	auto frontResult = parseFront(tokens);
 	if (auto front = frontResult.isSuccess()) {
-		// now pass to the suffix handler, which is recursive
-		return parseTypeSuffix(front.thing, front.loc, front.etc);
-	} else {
-		// failure = error, because it's required
-		return ParseResult!DType.makeError("failed to parse 'front' part of D type", tokens[0].loc);
+		if (allowSuffix) {
+			// now pass to the suffix handler, which is recursive
+			return parseTypeSuffix(front.thing, front.loc, front.etc);
+		}
+		// else
+		return frontResult;
+	} else if (auto err = frontResult.isError()) {
+		// raise (same type)
+		return frontResult;
 	}
 
-	// else not even that
 	return ParseResult!DType.makeFail();
 }
 
 void main()
 {
-	auto tokens = tokenize("int[][string] varname");
+	auto tokens = tokenize("Woot!int delegate(int[string] noice) varname");
 	foreach (t; tokens) {
 		writefln("token: %s", t);
 	}
@@ -198,7 +410,11 @@ void main()
 				writefln(" - %s", t);
 			}
 		},
-		(auto fail) {},
-		(auto error) {}
+		(auto fail) {
+			writefln("failed to parse a type");
+		},
+		(auto error) {
+			writefln("parse error: [%s] %s", error.message, error.loc);
+		}
 	);
 }
