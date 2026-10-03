@@ -1,6 +1,7 @@
 module dtype;
 
 import std.format;
+import std.stdio;
 
 struct FunctionArg {
     DType type;
@@ -10,6 +11,11 @@ struct FunctionArg {
 enum CallableKind {
     Function,
     Delegate
+}
+
+string spacify(string prefix) {
+    import std.array: replicate;
+    return " ".replicate(prefix.length);
 }
 
 CallableKind callableKindFromString(string kind) {
@@ -40,6 +46,7 @@ class Visitor {
 class DType {
     abstract void visit(Visitor v);
     abstract override string toString() const;
+    abstract void prettyPrint(string prefix);
 }
 
 class Primitive : DType {
@@ -49,6 +56,9 @@ class Primitive : DType {
     }
     override string toString() const => format("Primitive(%s)", prim);
     override void visit(Visitor v) => v.primitive(prim);
+    override void prettyPrint(string prefix) {
+        writefln("%s%s", prefix, toString());
+    }
 }
 
 class NamedThing: DType {
@@ -68,6 +78,17 @@ class NamedThing: DType {
         return format("NamedThing(%s)", name);
     }
     override void visit(Visitor v) => v.namedThing(name, typeArgs);
+    override void prettyPrint(string prefix) {
+        if (typeArgs.length > 0) {
+            writefln("%sNamedThing(%s![", prefix, name);
+            foreach (arg; typeArgs) {
+                arg.prettyPrint(spacify(prefix) ~ "  ");
+            }
+            writefln("%s])", spacify(prefix));
+        } else {
+            writefln("%sNamedThing(%s)", spacify(prefix), name);
+        }
+    }
 }
 
 class DynamicArray : DType {
@@ -77,6 +98,11 @@ class DynamicArray : DType {
     }
     override string toString() const => format("DynamicArray(elem: %s)", elem.toString());
     override void visit(Visitor v) => v.dynamicArray(elem);
+    override void prettyPrint(string prefix) {
+        writefln("%sDynamicArray(", prefix);
+        elem.prettyPrint(prefix ~ "    elem: ");
+        writefln("%s)", prefix);
+    }
 }
 
 class StaticArray : DType {
@@ -88,8 +114,13 @@ class StaticArray : DType {
     }
     override string toString() const => format("StaticArray(elem: %s, len: %s)", elem.toString(), length);
     override void visit(Visitor v) => v.staticArray(elem, length);
+    override void prettyPrint(string prefix) {
+        writefln("%sStaticArray(", prefix);
+        writefln("%s    length: %d", length);
+        elem.prettyPrint(prefix ~ "    elem:");
+        writefln("%s)", prefix);
+    }
 }
-
 
 class AssocArray : DType {
     DType key, value;
@@ -99,6 +130,12 @@ class AssocArray : DType {
     }
     override string toString() const => format("AssocArray(key: %s, value: %s)", key.toString(), value.toString());
     override void visit(Visitor v) => v.assocArray(key, value);
+    override void prettyPrint(string prefix) {
+        writefln("%sAssocArray(", prefix);
+        key.prettyPrint(spacify(prefix) ~ "  key:");
+        value.prettyPrint(spacify(prefix) ~ "  value:");
+        writefln("%s)", spacify(prefix));
+    }
 }
 
 class Callable : DType {
@@ -117,4 +154,16 @@ class Callable : DType {
         return format("Callable(kind: %s, returns: %s, args: [%s])", callableKindToString(kind), returnType.toString(), joined);
     }
     override void visit(Visitor v) => v.callable(kind, returnType, args);
+    override void prettyPrint(string prefix) {
+        writefln("%sCallable(", prefix);
+        writefln("%s  - kind: %s", prefix, callableKindToString(kind));
+        returnType.prettyPrint(prefix ~ "  - returnType: ");
+        writefln("%s  - args(", prefix);
+        foreach (arg; args) {
+            arg.type.prettyPrint(format("%s    \"%s\": ", prefix, arg.name));
+        }
+        writefln("%s    )", prefix); // end args
+        // end callable
+        writefln("%s)", prefix);
+    }
 }

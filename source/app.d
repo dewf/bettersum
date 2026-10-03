@@ -396,15 +396,16 @@ ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can di
 
 void main()
 {
-	auto tokens = tokenize("Woot!int delegate(int[string] noice) varname");
-	foreach (t; tokens) {
-		writefln("token: %s", t);
-	}
+	auto tokens = tokenize("Woot!int delegate(int[string] derp, X!int lerp, float slerp) varname");
+	// foreach (t; tokens) {
+	// 	writefln("token: %s", t);
+	// }
 
 	// writeln("====================");
 	parseType(tokens).match!void(
 		(auto success) {
-			writefln("DType: %s", success.thing);
+			// writefln("DType: %s", success.thing);
+			success.thing.prettyPrint("");
 			writeln("===== remaining tokens =====");
 			foreach (t; success.etc) {
 				writefln(" - %s", t);
