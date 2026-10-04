@@ -27,18 +27,31 @@ CallableKind callableKindFromString(string kind) {
     }
 }
 
-string callableKindToString(CallableKind kind) {
-    with(CallableKind)
-    final switch (kind) {
-        case Function: return "function";
-        case Delegate: return "delegate";
-    }
-}
+// string callableKindToString(CallableKind kind) {
+//     with(CallableKind)
+//     final switch (kind) {
+//         case Function: return "function";
+//         case Delegate: return "delegate";
+//     }
+// }
 
 enum Qualifier {
     Const,
     Immutable,
     Shared
+}
+
+Qualifier qualifierFromString(string qual) {
+    switch (qual) {
+        case "const":
+            return Qualifier.Const;
+        case "immutable":
+            return Qualifier.Immutable;
+        case "shared":
+            return Qualifier.Shared;
+        default:
+            throw new Exception("qualifierFromString: unhandled qual [" ~ qual ~ "]");
+    }
 }
 
 class Visitor {
@@ -61,8 +74,8 @@ class Qualified : DType {
     Qualifier qual;
     DType content;
     bool scoped; // parenthesized
-    this(Qualifier qual, DType content, bool scoped) {
-        this.qual = qual;
+    this(string qual, DType content, bool scoped) {
+        this.qual = qualifierFromString(qual);
         this.content = content;
         this.scoped = scoped;
     }
@@ -177,12 +190,12 @@ class Callable : DType {
         import std.algorithm: map;
         import std.range: join;
         auto joined = args.map!(arg => format("Arg(type: %s, name: %s)", arg.type.toString(), arg.name !is null ? arg.name : "[none]")).join(", ");
-        return format("Callable(kind: %s, returns: %s, args: [%s])", callableKindToString(kind), returnType.toString(), joined);
+        return format("Callable(kind: %s, returns: %s, args: [%s])", kind.to!string, returnType.toString(), joined);
     }
     override void visit(Visitor v) => v.callable(kind, returnType, args);
     override void prettyPrint(string prefix) {
         writefln("%sCallable(", prefix);
-        writefln("%s  - kind: %s", prefix, callableKindToString(kind));
+        writefln("%s  - kind: %s", prefix, kind.to!string);
         returnType.prettyPrint(prefix ~ "  - returnType: ");
         writefln("%s  - args(", prefix);
         foreach (arg; args) {

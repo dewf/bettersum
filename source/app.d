@@ -396,18 +396,18 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 	// any leading qualifiers?
 
-	auto constResult = parseKeyword(tokens, "const");
-	if (auto constSucc = constResult.isSuccess()) {
+	auto qualResult = parseOneOfKeywords(tokens, ["const", "immutable", "shared"]);
+	if (auto qualifier = qualResult.isSuccess()) {
 
 		// if parens, then recurse only on content
 		// and then we still have to process the type suffix
-		auto parenResult = parseBetween(constSucc.etc, Token.Symbol.LeftParen, Token.Symbol.RightParen);
+		auto parenResult = parseBetween(qualifier.etc, Token.Symbol.LeftParen, Token.Symbol.RightParen);
 		if (auto parenContent = parenResult.isSuccess()) {
 
 			auto contentTypeResult = parseType(parenContent.thing);
 			if (auto contentType = contentTypeResult.isSuccess()) {
 
-				auto dt = new Qualified(Qualifier.Const, contentType.thing, true);
+				auto dt = new Qualified(qualifier.thing, contentType.thing, true);
 				// that's now our 'front', now process suffix (after parens)
 				return parseTypeSuffix(dt, parenContent.loc, parenContent.etc, context);
 
@@ -426,10 +426,10 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 		if (context != ParseTypeContext.SingleTypeParam) {
 
 			// recurse on everything to the right of here: it's ALL content (nothing following)
-			auto constContentResult = parseType(constSucc.etc, context);
+			auto constContentResult = parseType(qualifier.etc, context);
 			if (auto content = constContentResult.isSuccess()) {
 
-				auto dt = new Qualified(Qualifier.Const, content.thing, false);
+				auto dt = new Qualified(qualifier.thing, content.thing, false);
 				return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
 
 			} else if (auto err = constContentResult.isError()) {
@@ -438,11 +438,11 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 			}
 
 		} else {
-			return ParseResult!DType.makeError("parseType: can't have unscoped `const` in the context of a type parameter", constSucc.loc);
+			return ParseResult!DType.makeError("parseType: can't have unscoped `const` in the context of a type parameter", qualifier.loc);
 		}
 
 		// else error, const content was required but not present
-		return ParseResult!DType.makeError("parseType: 'const' was not followed by a type", constSucc.loc);
+		return ParseResult!DType.makeError("parseType: 'const' was not followed by a type", qualifier.loc);
 	}
 
 	// else no leading stuff:
@@ -468,7 +468,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("Woot!const(int[][string]) delegate(string y) yoooooo"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("const immutable shared int whatever"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
