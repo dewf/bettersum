@@ -458,6 +458,11 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseTypeContext.Normal) {
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
+	// we can short circuit all this ...
+	if (auto lit = tryToken(tokens, 0, t => t.isTypeLiteral())) {
+		return ParseResult!DType.makeSuccess(new TypeLiteral(*lit), tokens[0].loc, tokens[1..$]);
+	}
+
 	// check for 'ref' regardless, but it's only allowed in some contexts
 	auto refResult = parseKeyword(tokens, "ref");
 	if (auto ref_ = refResult.isSuccess()) {

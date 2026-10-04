@@ -65,6 +65,7 @@ Qualifier qualifierFromString(string qual) {
 }
 
 class Visitor {
+    void typeLiteral(string literal) {}
     void ref_(DType content) {}
     void qualified(Qualifier qual, DType content, bool scoped) {}
     void primitive(string prim) {}
@@ -80,6 +81,18 @@ class DType {
     abstract void visit(Visitor v);
     abstract override string toString() const;
     abstract void prettyPrint(string prefix);
+}
+
+class TypeLiteral : DType {
+    string literal;
+    this(string literal) {
+        this.literal = literal;
+    }
+    override string toString() const => format("TypeLiteral(%s)", literal);
+    override void visit(Visitor v) => v.typeLiteral(literal);
+    override void prettyPrint(string prefix) {
+        writefln("%sTypeLiteral(%s)", prefix, literal);
+    }
 }
 
 class Ref : DType {
@@ -364,6 +377,9 @@ class Renderer : Visitor {
                     break;
             }
         }
+    }
+    override void typeLiteral(string literal) {
+        output ~= literal;
     }
 }
 

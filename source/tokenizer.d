@@ -97,6 +97,10 @@ bool isNumeric(string str) {
 	return false;
 }
 
+bool isBackticked(string str) {
+	return str[0] == '`' && str[$-1] == '`';
+}
+
 Token[] classify(Chunk[] chunks) {
 	Token[] result;
 	foreach (ch; chunks) {
@@ -111,7 +115,10 @@ Token[] classify(Chunk[] chunks) {
 			result ~= Token.mkNumeric(ch);
 		} else if (isIdentifier(ch.str)) {
 			result ~= Token.mkIdentifier(ch);
-		} else {
+		} else if (isBackticked(ch.str)) {
+			result ~= Token.mkTypeLiteral(ch);
+		}
+		else {
 			throw new Exception("could not classify lexed chunk: [" ~ ch.str ~ "]");
 		}
 	}
@@ -143,7 +150,8 @@ struct Token {
 		Keyword,
 		Identifier,
 		Numeric,
-		Symbol
+		Symbol,
+		TypeLiteral
 	}
 	enum Symbol {
 		Bang,
@@ -221,6 +229,17 @@ struct Token {
 		return null;
 	}
 
+	static Token mkTypeLiteral(Chunk ch) {
+		Content c = { text: ch.str[1..$-1] }; // strip backticks
+		return Token(Tag.TypeLiteral, c, Location(ch));
+	}
+	const(string)* isTypeLiteral() {
+		if (tag == Tag.TypeLiteral) {
+			return &content.text;
+		}
+		return null;
+	}
+
 	string toString() const {
 		import std.format;
 		import std.conv: to;
@@ -235,6 +254,8 @@ struct Token {
 				return format("Numeric(%s)%s", content.text, loc);
 			case Tag.Symbol:
 				return format("Symbol(%s)%s", content.symbol.to!string, loc);
+			case Tag.TypeLiteral:
+				return format("TypeLiteral(%s)%s", content.text, loc);
 		}
 	}
 }

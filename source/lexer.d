@@ -4,6 +4,25 @@ import util;
 
 private:
 
+bool backticked(string input, out string value) {
+	if (input.length < 2) return false;
+	if (input[0] == '`') {
+		// find matching
+		int i = 1;
+		while (i < input.length) {
+			if (input[i] == '`') {
+				value = input[0..i+1]; // include backticks (for classifier)
+				return true;
+			} else if (input[i] == '\n') {
+				throw new Exception("lexer: newlines not allowed in backticked expression");
+			}
+			i++;
+		}
+		// else no matching backtick found, fall through
+	}
+	return false;
+}
+
 bool alphaNumeric(string input, out string value) {
 	bool isAlphaNumeric(char ch) {
 		return
@@ -90,7 +109,11 @@ Chunk[] chunkify(string input) {
 	PosDelta delta;
 	size_t i;
 	while (i < input.length) {
-		if (alphaNumeric(input[i..$], current)) {
+		if (backticked(input[i..$], current)) {
+			output ~= Chunk(current, line, col);
+			col += current.length;
+			i += current.length;
+		} else if (alphaNumeric(input[i..$], current)) {
 			output ~= Chunk(current, line, col);
 			col += current.length;
 			i += current.length;

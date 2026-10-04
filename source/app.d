@@ -9,11 +9,11 @@ struct Woot(T) {
 	T x;
 }
 
-const shared string[int][void delegate(Woot!int x) nothrow @safe] derp;
+const shared string[int]*[void delegate(Woot!int x) nothrow @safe] derp;
 
 void main()
 {
-	auto tokens = tokenize("const shared string[int][void delegate(Woot!int x) nothrow @safe] derp");
+	auto tokens = tokenize(q{const shared string[int]*[`void delegate(Woot!int x) nothrow @safe`] derp});
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
