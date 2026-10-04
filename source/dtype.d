@@ -14,6 +14,24 @@ enum CallableKind {
     Delegate
 }
 
+enum FunctionAttr {
+    Pure,
+    NoThrow,
+    Safe,
+    NoGC
+}
+
+FunctionAttr functionAttrFromString(string attr) {
+    switch (attr) {
+        case "pure": return FunctionAttr.Pure;
+        case "nothrow": return FunctionAttr.NoThrow;
+        case "safe": return FunctionAttr.Safe;
+        case "nogc": return FunctionAttr.NoGC;
+        default:
+            throw new Exception("functionAttrFromString() - unknown attr");
+    }
+}
+
 string spacify(string prefix) {
     import std.array: replicate;
     return " ".replicate(prefix.length);
@@ -26,14 +44,6 @@ CallableKind callableKindFromString(string kind) {
         throw new Exception("callableKindFromString: unknown kind");
     }
 }
-
-// string callableKindToString(CallableKind kind) {
-//     with(CallableKind)
-//     final switch (kind) {
-//         case Function: return "function";
-//         case Delegate: return "delegate";
-//     }
-// }
 
 enum Qualifier {
     Const,
@@ -181,27 +191,38 @@ class Callable : DType {
     CallableKind kind;
     DType returnType;
     FunctionArg[] args;
-    this(string kind, DType returnType, FunctionArg[] args) {
+    FunctionAttr[] attrs;
+    this(string kind, DType returnType, FunctionArg[] args, FunctionAttr[] attrs) {
         this.kind = callableKindFromString(kind);
         this.returnType = returnType;
         this.args = args;
+        this.attrs = attrs;
     }
     override string toString() const {
         import std.algorithm: map;
         import std.range: join;
-        auto joined = args.map!(arg => format("Arg(type: %s, name: %s)", arg.type.toString(), arg.name !is null ? arg.name : "[none]")).join(", ");
-        return format("Callable(kind: %s, returns: %s, args: [%s])", kind.to!string, returnType.toString(), joined);
+        auto joinedArgs = args.map!(arg => format("Arg(type: %s, name: %s)", arg.type.toString(), arg.name !is null ? arg.name : "[none]")).join(", ");
+        auto joinedAttrs = attrs.map!(attr => attr.to!string).join(", ");
+        return format("Callable(kind: %s, returns: %s, args: [%s], attrs: [%s])", kind.to!string, returnType.toString(), joinedArgs, joinedAttrs);
     }
     override void visit(Visitor v) => v.callable(kind, returnType, args);
     override void prettyPrint(string prefix) {
+        import std.algorithm: map;
+        import std.range: join;
         writefln("%sCallable(", prefix);
         writefln("%s  kind: %s", spacify(prefix), kind.to!string);
         returnType.prettyPrint(spacify(prefix) ~ "  returnType: ");
-        writefln("%s  args: (", spacify(prefix));
-        foreach (arg; args) {
-            arg.type.prettyPrint(format("%s    \"%s\": ", spacify(prefix), arg.name));
+        if (args.length == 0) {
+            writefln("%s  args: [none]", spacify(prefix));
+        } else {
+            writefln("%s  args: (", spacify(prefix));
+            foreach (arg; args) {
+                arg.type.prettyPrint(format("%s    \"%s\": ", spacify(prefix), arg.name));
+            }
+            writefln("%s  )", spacify(prefix)); // end args
         }
-        writefln("%s  )", spacify(prefix)); // end args
+        auto joinedAttrs = attrs.map!(attr => attr.to!string).join(", ");
+        writefln("%s  attrs: [%s]", spacify(prefix), joinedAttrs);
         // end callable
         writefln("%s)", spacify(prefix));
     }

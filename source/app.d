@@ -270,6 +270,11 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 	auto contentResult = parseBetween(tokens, Token.Symbol.LeftParen, Token.Symbol.RightParen);
 	if (auto content = contentResult.isSuccess()) {
 
+		if (content.thing.length == 0) {
+			// empty args, no worries
+			return ParseResult!(FunctionArg[]).makeSuccess([], content.loc, content.etc);
+		}
+
 		FunctionArg[] args;
 		auto input = content.thing;
 
@@ -330,7 +335,47 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 	return ParseResult!(FunctionArg[]).makeFail();
 }
 
-ParseResult!DType parseCallable(DType returnType, Location loc, Token[] tokens) {
+ParseResult!(FunctionAttr[]) parseFunctionAttrs(Token[] tokens) {
+	FunctionAttr[] attrs;
+	Location lastLoc;
+	auto input = tokens;
+	while (input.length > 0) {
+		// one of:
+
+		// @safe @nogc
+		auto atResult = parseSymbol(input, Token.Symbol.At);
+		if (auto at = atResult.isSuccess()) {
+			auto kwResult = parseOneOfKeywords(at.etc, ["safe", "nogc"]);
+			if (auto kw = kwResult.isSuccess()) {
+				attrs ~= functionAttrFromString(kw.thing);
+				input = kw.etc;
+				lastLoc = kw.loc;
+				continue;
+			} else {
+				// on fail: (no error possible)
+				// after an @ requires either 'safe' or 'nogc' (or something else, which we'll add later)
+				return ParseResult!(FunctionAttr[]).makeError("parseFunctionAttrs: failed to match function attr keyword after '@'", at.loc);
+			}
+		} // no error possible
+
+		// pure nothrow
+		auto otherResult = parseOneOfKeywords(input, ["pure", "nothrow"]);
+		if (auto other = otherResult.isSuccess()) {
+			attrs ~= functionAttrFromString(other.thing);
+			input = other.etc;
+			lastLoc = other.loc;
+			continue;
+		}
+		// else failed to match any - we're done
+		break;
+	}
+	if (attrs.length > 0) {
+		return ParseResult!(FunctionAttr[]).makeSuccess(attrs, lastLoc, input);
+	}
+	return ParseResult!(FunctionAttr[]).makeFail();
+}
+
+ParseResult!DType parseCallable(DType returnType, Token[] tokens) {
 	auto kwResult = parseOneOfKeywords(tokens, ["function", "delegate"]);
 	if (auto kw = kwResult.isSuccess()) {
 
@@ -338,9 +383,15 @@ ParseResult!DType parseCallable(DType returnType, Location loc, Token[] tokens) 
 		auto argsResult = parseFunctionArgs(kw.etc);
 		if (auto args = argsResult.isSuccess()) {
 
-			// TODO: parse optional suffixes (pure/nothrow/etc)
+			// optional function attrs (pure, nothrow, etc)
+			auto attrsResult = parseFunctionAttrs(args.etc);
+			if (auto attrs = attrsResult.isSuccess()) {
+				auto dt = new Callable(kw.thing, returnType, args.thing, attrs.thing);
+				return ParseResult!DType.makeSuccess(dt, attrs.loc, attrs.etc);
+			}
 
-			auto dt = new Callable(kw.thing, returnType, args.thing);
+			// else
+			auto dt = new Callable(kw.thing, returnType, args.thing, []);
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
@@ -377,7 +428,7 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 
 		// - 'delegate' / 'function' + (args) + pure/nothrow/@safe/etc
 		// current front is return type
-		auto callableResult = parseCallable(front, loc, tokens);
+		auto callableResult = parseCallable(front, tokens);
 		if (auto callable = callableResult.isSuccess()) {
 			// need to recurse to see if there is more of a suffix (this callable might be part of an array, or a return type itself!)
 			return parseTypeSuffix(callable.thing, callable.loc, callable.etc, context);
@@ -429,7 +480,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 			auto constContentResult = parseType(qualifier.etc, context);
 			if (auto content = constContentResult.isSuccess()) {
 
-				auto dt = new Qualified(qualifier.thing, content.thing, false);
+				auto dt = new Qualified(qualifier.thing, content.thing, false); // scoped = false
 				return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
 
 			} else if (auto err = constContentResult.isError()) {
@@ -468,7 +519,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("const immutable shared void delegate(int x)[] whatever"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("const(string delegate() pure nothrow @safe)[string] whatever"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
