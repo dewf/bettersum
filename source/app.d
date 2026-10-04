@@ -281,7 +281,7 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 		while (input.length > 0) {
 
 			// parse type (required)
-			auto typeResult = parseType(input);
+			auto typeResult = parseType(input, ParseTypeContext.FunctionArgs);
 			if (auto type = typeResult.isSuccess()) {
 
 				input = type.etc;
@@ -395,7 +395,7 @@ ParseResult!DType parseCallable(DType returnType, Token[] tokens) {
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
-			reraise!DType(argsResult);
+			return reraise!DType(argsResult);
 		} // else no args list found
 
 		// ... so it's an error, because the keyword MUST be followed by a parameter list
@@ -407,7 +407,8 @@ ParseResult!DType parseCallable(DType returnType, Token[] tokens) {
 
 enum ParseTypeContext {
 	Normal,
-	SingleTypeParam
+	SingleTypeParam,
+	FunctionArgs // 'ref' allowed
 }
 
 ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, ParseTypeContext context) {
@@ -452,7 +453,28 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseTypeContext.Normal) {
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
-	// any leading qualifiers?
+	// check for 'ref' regardless, but it's only allowed in some contexts
+	auto refResult = parseKeyword(tokens, "ref");
+	if (auto ref_ = refResult.isSuccess()) {
+		if (context != ParseTypeContext.FunctionArgs) {
+			// whoops, not allowed
+			return ParseResult!DType.makeError("'ref' only usable in function/delegate arg types'", ref_.loc);
+		}
+		// proceed as normal
+		auto refContent = parseType(ref_.etc, context);
+		if (auto content = refContent.isSuccess()) {
+			if (cast(Ref)content.thing !is null) {
+				return ParseResult!DType.makeError("can't have 'ref ref' type!", content.loc);
+			}
+			auto dt = new Ref(content.thing);
+			return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
+		} else if (auto err = refContent.isError()) {
+			// raise error
+			return refContent;
+		}
+		// else no type was parsed - error, because required
+		return ParseResult!DType.makeError("parsing 'ref' content: no subsequent type", ref_.loc);
+	}
 
 	auto qualResult = parseOneOfKeywords(tokens, ["const", "immutable", "shared"]);
 	if (auto qualifier = qualResult.isSuccess()) {
@@ -526,7 +548,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("int**[] whatever"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("void delegate(ref int[string] x) @safe nothrow whatever"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }

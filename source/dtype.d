@@ -65,6 +65,7 @@ Qualifier qualifierFromString(string qual) {
 }
 
 class Visitor {
+    void ref_(DType content) {}
     void qualified(Qualifier qual, DType content, bool scoped) {}
     void primitive(string prim) {}
     void namedThing(string name, DType[] typeArgs) {}
@@ -79,6 +80,20 @@ class DType {
     abstract void visit(Visitor v);
     abstract override string toString() const;
     abstract void prettyPrint(string prefix);
+}
+
+class Ref : DType {
+    DType content;
+    this(DType content) {
+        this.content = content;
+    }
+    override string toString() const => format("Ref(%s)", content.toString());
+    override void visit(Visitor v) => v.ref_(content);
+    override void prettyPrint(string prefix) {
+        writefln("%sRef(", prefix);
+        content.prettyPrint(spacify(prefix) ~ "  ");
+        writefln("%s)", spacify(prefix));
+    }
 }
 
 class Qualified : DType {
