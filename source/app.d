@@ -468,7 +468,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("const immutable shared int whatever"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("const immutable shared void delegate(int x)[] whatever"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }

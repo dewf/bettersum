@@ -195,14 +195,14 @@ class Callable : DType {
     override void visit(Visitor v) => v.callable(kind, returnType, args);
     override void prettyPrint(string prefix) {
         writefln("%sCallable(", prefix);
-        writefln("%s  - kind: %s", prefix, kind.to!string);
-        returnType.prettyPrint(prefix ~ "  - returnType: ");
-        writefln("%s  - args(", prefix);
+        writefln("%s  kind: %s", spacify(prefix), kind.to!string);
+        returnType.prettyPrint(spacify(prefix) ~ "  returnType: ");
+        writefln("%s  args: (", spacify(prefix));
         foreach (arg; args) {
-            arg.type.prettyPrint(format("%s    \"%s\": ", prefix, arg.name));
+            arg.type.prettyPrint(format("%s    \"%s\": ", spacify(prefix), arg.name));
         }
-        writefln("%s    )", prefix); // end args
+        writefln("%s  )", spacify(prefix)); // end args
         // end callable
-        writefln("%s)", prefix);
+        writefln("%s)", spacify(prefix));
     }
 }
