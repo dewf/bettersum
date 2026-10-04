@@ -35,6 +35,7 @@ string callableKindToString(CallableKind kind) {
 }
 
 class Visitor {
+    void const_(DType content) {}
     void primitive(string prim) {}
     void namedThing(string name, DType[] typeArgs) {}
     void dynamicArray(DType elem) {}
@@ -47,6 +48,22 @@ class DType {
     abstract void visit(Visitor v);
     abstract override string toString() const;
     abstract void prettyPrint(string prefix);
+}
+
+class Const : DType {
+    DType content;
+    bool scoped; // parenthesized
+    this(DType content, bool scoped) {
+        this.content = content;
+        this.scoped = scoped;
+    }
+    override string toString() const => format("Const(%s)", content.toString());
+    override void visit(Visitor v) => v.const_(content);
+    override void prettyPrint(string prefix) {
+        writefln("%sconst%s(", prefix, scoped ? "[scoped]" : "");
+        content.prettyPrint(spacify(prefix) ~ "  ");
+        writefln("%s)", spacify(prefix));
+    }
 }
 
 class Primitive : DType {
@@ -100,8 +117,8 @@ class DynamicArray : DType {
     override void visit(Visitor v) => v.dynamicArray(elem);
     override void prettyPrint(string prefix) {
         writefln("%sDynamicArray(", prefix);
-        elem.prettyPrint(prefix ~ "    elem: ");
-        writefln("%s)", prefix);
+        elem.prettyPrint(spacify(prefix) ~ "  elem: ");
+        writefln("%s)", spacify(prefix));
     }
 }
 
@@ -132,8 +149,8 @@ class AssocArray : DType {
     override void visit(Visitor v) => v.assocArray(key, value);
     override void prettyPrint(string prefix) {
         writefln("%sAssocArray(", prefix);
-        key.prettyPrint(spacify(prefix) ~ "  key:");
-        value.prettyPrint(spacify(prefix) ~ "  value:");
+        key.prettyPrint(spacify(prefix) ~ "    key: ");
+        value.prettyPrint(spacify(prefix) ~ "  value: ");
         writefln("%s)", spacify(prefix));
     }
 }

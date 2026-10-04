@@ -7,8 +7,18 @@ private:
 
 bool isKeyword(string str) {
 	static known = setFromItems!string([
+		// storage:
+		"ref",
+		// type qualifiers:
+		"const", "immutable", "shared", "inout",
+		// callables:
 		"function", "delegate",
-		"const", "immutable", "ref", "nothrow", "pure", "safe", "typeof"
+		// function type attrs:
+		"pure", "nothrow",
+		// function type attrs (@ prefix)
+		"safe", "nogc",
+		// misc
+		"typeof"
 	]);
 	return (str in known) != null;
 }
