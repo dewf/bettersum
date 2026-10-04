@@ -173,7 +173,7 @@ ParseResult!(DType[]) parseTypeArguments(Token[] tokens) {
 	tokens = bangResult.success.etc;
 
 	// is it a single type?
-	auto singleTypeResult = parseType(tokens, false); // don't follow suffix (for this variant)
+	auto singleTypeResult = parseType(tokens, ParseTypeContext.SingleTypeParam);
 	if (auto single = singleTypeResult.isSuccess()) {
 		return ParseResult!(DType[]).makeSuccess([single.thing], single.loc, single.etc);
 	} else if (auto err = singleTypeResult.isError()) {
@@ -354,42 +354,51 @@ ParseResult!DType parseCallable(DType returnType, Location loc, Token[] tokens) 
 	return ParseResult!DType.makeFail();
 }
 
-ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens) {
+enum ParseTypeContext {
+	Normal,
+	SingleTypeParam
+}
+
+ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, ParseTypeContext context) {
 	// one of:
 
 	// - array suffix (recurse on content, depending)
 	auto bracketedResult = parseBracketed(front, tokens);
 	if (auto bracketed = bracketedResult.isSuccess()) {
 		// need to recurse to see if there is more of a suffix
-		return parseTypeSuffix(bracketed.thing, bracketed.loc, bracketed.etc);
+		return parseTypeSuffix(bracketed.thing, bracketed.loc, bracketed.etc, context);
 
 	} else if (auto err = bracketedResult.isError()) {
 		// re-raise error (same type)
 		return bracketedResult;
 	}
 
-	// - 'delegate' / 'function' + (args) + pure/nothrow/@safe/etc
-	// current front is return type
-	auto callableResult = parseCallable(front, loc, tokens);
-	if (auto callable = callableResult.isSuccess()) {
-		// need to recurse to see if there is more of a suffix (this callable might be part of an array, or a return type itself!)
-		return parseTypeSuffix(callable.thing, callable.loc, callable.etc);
-	} else if (auto err = callableResult.isError()) {
-		// re-raise
-		return callableResult;
+	if (context != ParseTypeContext.SingleTypeParam) { // can't process callables without parens in this context, because that's definitely not wanted
+
+		// - 'delegate' / 'function' + (args) + pure/nothrow/@safe/etc
+		// current front is return type
+		auto callableResult = parseCallable(front, loc, tokens);
+		if (auto callable = callableResult.isSuccess()) {
+			// need to recurse to see if there is more of a suffix (this callable might be part of an array, or a return type itself!)
+			return parseTypeSuffix(callable.thing, callable.loc, callable.etc, context);
+		} else if (auto err = callableResult.isError()) {
+			// re-raise
+			return callableResult;
+		}
 	}
 
 	// - none of the above - that's fine, means the type is finally complete (hopefully)
 	return ParseResult!DType.makeSuccess(front, loc, tokens);
 }
 
-ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can disable suffix parsing for single-argument (unparenthesized) type params
+ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseTypeContext.Normal) {
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
 	// any leading stuff? (const/immutable/shared/etc)
 
 	auto constResult = parseKeyword(tokens, "const");
 	if (auto constSucc = constResult.isSuccess()) {
+
 		// if parens, then recurse only on content
 		// and then we still have to process the type suffix
 		auto parenResult = parseBetween(constSucc.etc, Token.Symbol.LeftParen, Token.Symbol.RightParen);
@@ -400,7 +409,7 @@ ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can di
 
 				auto dt = new Const(contentType.thing, true);
 				// that's now our 'front', now process suffix (after parens)
-				return parseTypeSuffix(dt, parenContent.loc, parenContent.etc);
+				return parseTypeSuffix(dt, parenContent.loc, parenContent.etc, context);
 
 			} else if (auto err = contentTypeResult.isError()) {
 				// re-raise
@@ -413,19 +422,26 @@ ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can di
 
 		// else =====
 
-		// recurse on everything to the right of here: it's ALL content (nothing following)
-		auto constContentResult = parseType(constSucc.etc);
-		if (auto content = constContentResult.isSuccess()) {
+		// can't process unscoped const in a type parameter context
+		if (context != ParseTypeContext.SingleTypeParam) {
 
-			auto dt = new Const(content.thing, false);
-			return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
+			// recurse on everything to the right of here: it's ALL content (nothing following)
+			auto constContentResult = parseType(constSucc.etc, context);
+			if (auto content = constContentResult.isSuccess()) {
 
-		} else if (auto err = constContentResult.isError()) {
-			// re-raise nested parse errors
-			return constContentResult;
+				auto dt = new Const(content.thing, false);
+				return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
+
+			} else if (auto err = constContentResult.isError()) {
+				// re-raise nested parse errors
+				return constContentResult;
+			}
+
+		} else {
+			return ParseResult!DType.makeError("parseType: can't have unscoped `const` in the context of a type parameter", constSucc.loc);
 		}
 
-		// else error, const content was required
+		// else error, const content was required but not present
 		return ParseResult!DType.makeError("parseType: 'const' was not followed by a type", constSucc.loc);
 	}
 
@@ -433,17 +449,8 @@ ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can di
 
 	auto frontResult = parseFront(tokens);
 	if (auto front = frontResult.isSuccess()) {
-		// !!! but wait, this suffix handling stuff is broken in the case of arrays, which AFAIK should still work when used in a type parameter
-		// eg Woot!int[]
-		// is the space-separated stuff which fails ...
-		// so do we need multiple potential suffix handlers?
-		// one for arrays, and one for callables? and only callables are banned in no-suffix mode?
-		if (allowSuffix) {
-			// now pass to the suffix handler, which is recursive
-			return parseTypeSuffix(front.thing, front.loc, front.etc);
-		}
-		// else
-		return frontResult;
+		// now pass to the suffix handler, which is recursive
+		return parseTypeSuffix(front.thing, front.loc, front.etc, context);
 	} else if (auto err = frontResult.isError()) {
 		// raise (same type)
 		return frontResult;
@@ -456,13 +463,12 @@ ParseResult!DType parseType(Token[] tokens, bool allowSuffix = true) { // can di
 // const int[][] derp2;
 // const int[][string] yorp;
 // const(int)[const(string)] argh;
-
-// broken:
-// Woot!int[] // disabled suffix handling for single type param will prevent [] from being handled ... I think
+// struct Woot(T) { T x; }
+// Woot!int[][string] delegate(string y) derp;
 
 void main()
 {
-	auto tokens = tokenize("const int[string] function(const(float) x)");
+	auto tokens = tokenize("Woot!const(int[][string]) delegate(string y)"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
@@ -481,7 +487,7 @@ void main()
 			writefln("failed to parse a type");
 		},
 		(auto error) {
-			writefln("parse error: [%s] %s", error.message, error.loc);
+			writefln("parse error: { %s } %s", error.message, error.loc);
 		}
 	);
 }
