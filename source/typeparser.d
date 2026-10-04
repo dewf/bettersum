@@ -14,8 +14,8 @@ ParseResult(T) {
 }
 }));
 
-ParseResult!U reraise(U,T)(ParseResult!T original) {
-	return ParseResult!U.makeError(original.error.message, original.error.loc);
+ParseResult!T reraise(T)(string message, Location loc) {
+	return ParseResult!T.makeError(message, loc);
 }
 
 T tryToken(T)(Token[] input, int index, T delegate(Token*) func) { // delegate arg must be pointer/ref! otherwise it's a Token copy, and the .isWhatever methods will return pointers to temporary locations! memory corruption galore
@@ -152,7 +152,7 @@ ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 
 	} else if (auto err = bracketResult.isError()) {
 		// raise bracket errors
-		return reraise!DType(bracketResult);
+		return reraise!DType(err.message, err.loc);
 	}
 
 	// else no worries
@@ -182,7 +182,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 		return ParseResult!TypeArgsResult.makeSuccess(res, single.loc, single.etc);
 	} else if (auto err = singleTypeResult.isError()) {
 		// re-raise
-		return reraise!TypeArgsResult(singleTypeResult);
+		return reraise!TypeArgsResult(err.message, err.loc);
 	} // else simple failure - try parenthesized parse instead
 
 	// else is it a parenthesized list?
@@ -220,7 +220,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 
 			} else if (auto err = typeResult.isError()) {
 				// raise type-parsing error
-				return reraise!TypeArgsResult(typeResult);
+				return reraise!TypeArgsResult(err.message, err.loc);
 			}
 
 			// else it's an error because we failed to parse a type (and didn't continue/exit first)
@@ -230,7 +230,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 
 	} else if (auto err = parensResult.isError()) {
 		// raise error (requires conversion)
-		return reraise!TypeArgsResult(parensResult);
+		return reraise!TypeArgsResult(err.message, err.loc);
 	}
 	// no parens pair, fail gracefully
 	return ParseResult!TypeArgsResult.makeFail();
@@ -258,7 +258,7 @@ ParseResult!DType parseFront(Token[] tokens) {
 
 		} else if (auto err = argsResult.isError()) {
 			// raise error (requires conversion)
-			return reraise!DType(argsResult);
+			return reraise!DType(err.message, err.loc);
 		}
 
 		// else no type args - no worries
@@ -322,7 +322,7 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 
 			} else if (auto err = typeResult.isError()) {
 				// type parsing error, re-raise
-				return reraise!(FunctionArg[])(typeResult);
+				return reraise!(FunctionArg[])(err.message, err.loc);
 			}
 
 			// else non-existent - error because it's required
@@ -333,7 +333,7 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 
 	} else if (auto err = contentResult.isError()) {
 		// re-raise badness (missing right paren or whatever)
-		reraise!(FunctionArg[])(contentResult);
+		reraise!(FunctionArg[])(err.message, err.loc);
 	}
 
 	// else no parens (outside will make this an error)
@@ -400,7 +400,7 @@ ParseResult!DType parseCallable(DType returnType, Token[] tokens) {
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
-			return reraise!DType(argsResult);
+			return reraise!DType(err.message, err.loc);
 		} // else no args list found
 
 		// ... so it's an error, because the keyword MUST be followed by a parameter list
