@@ -14,6 +14,13 @@ ParseResult(T) {
 }
 }));
 
+mixin(sumtype(q{
+SimpleResult(T) {
+	Success(`T` thing, `Location` loc, `Token[]` etc),
+	Fail
+}
+}));
+
 ParseResult!T reraise(T)(string message, Location loc) {
 	return ParseResult!T.makeError(message, loc);
 }
@@ -28,54 +35,54 @@ T tryToken(T)(Token[] input, int index, T delegate(Token*) func) { // delegate a
 // TODO: change those of these which can't have errors, to something simpler than ParseResult?
 // maybe SimpleParseResult? or should Fail() have its own payload?
 
-ParseResult!DType parsePrimitive(Token[] tokens) {
+SimpleResult!DType parsePrimitive(Token[] tokens) {
 	if (auto prim = tryToken(tokens, 0, t => t.isPrimitive())) {
-		return ParseResult!DType.makeSuccess(new Primitive(*prim), tokens[0].loc, tokens[1..$]);
+		return SimpleResult!DType.makeSuccess(new Primitive(*prim), tokens[0].loc, tokens[1..$]);
 	}
-	return ParseResult!DType.makeFail();
+	return SimpleResult!DType.makeFail();
 }
 
-ParseResult!Unit parseKeyword(Token[] tokens, string which) {
+SimpleResult!Unit parseKeyword(Token[] tokens, string which) {
 	if (auto kw = tryToken(tokens, 0, t => t.isKeyword())) {
 		if (*kw == which) {
-			return ParseResult!Unit.makeSuccess(Unit(), tokens[0].loc, tokens[1..$]);
+			return SimpleResult!Unit.makeSuccess(Unit(), tokens[0].loc, tokens[1..$]);
 		}
 	}
-	return ParseResult!Unit.makeFail();
+	return SimpleResult!Unit.makeFail();
 }
 
-ParseResult!string parseOneOfKeywords(Token[] tokens, string[] keywords) {
+SimpleResult!string parseOneOfKeywords(Token[] tokens, string[] keywords) {
 	import std.algorithm.searching: canFind;
 	if (auto kw = tryToken(tokens, 0, t => t.isKeyword())) {
 		if (keywords.canFind(*kw)) {
-			return ParseResult!string.makeSuccess(*kw, tokens[0].loc, tokens[1..$]);
+			return SimpleResult!string.makeSuccess(*kw, tokens[0].loc, tokens[1..$]);
 		}
 		// else was some other keyword, no biggie -- fall through to failure
 	}
-	return ParseResult!string.makeFail();
+	return SimpleResult!string.makeFail();
 }
 
-ParseResult!Unit parseSymbol(Token[] tokens, Token.Symbol which) {
+SimpleResult!Unit parseSymbol(Token[] tokens, Token.Symbol which) {
 	if (auto sym = tryToken(tokens, 0, t => t.isSymbol())) {
 		if (*sym == which) {
-			return ParseResult!Unit.makeSuccess(Unit(), tokens[0].loc, tokens[1..$]);
+			return SimpleResult!Unit.makeSuccess(Unit(), tokens[0].loc, tokens[1..$]);
 		}
 	}
-	return ParseResult!Unit.makeFail();
+	return SimpleResult!Unit.makeFail();
 }
 
-ParseResult!string parseIdentifier(Token[] tokens) {
+SimpleResult!string parseIdentifier(Token[] tokens) {
 	if (auto id = tryToken(tokens, 0, t => t.isIdentifier())) {
-		return ParseResult!string.makeSuccess(*id, tokens[0].loc, tokens[1..$]);
+		return SimpleResult!string.makeSuccess(*id, tokens[0].loc, tokens[1..$]);
 	}
-	return ParseResult!string.makeFail();
+	return SimpleResult!string.makeFail();
 }
 
-ParseResult!string parseNumeric(Token[] tokens) {
+SimpleResult!string parseNumeric(Token[] tokens) {
 	if (auto num = tryToken(tokens, 0, t => t.isNumeric())) {
-		return ParseResult!string.makeSuccess(*num, tokens[0].loc, tokens[1..$]);
+		return SimpleResult!string.makeSuccess(*num, tokens[0].loc, tokens[1..$]);
 	}
-	return ParseResult!string.makeFail();
+	return SimpleResult!string.makeFail();
 }
 
 ParseResult!(Token[]) parseBetween(Token[] tokens, Token.Symbol left, Token.Symbol right) {
@@ -242,8 +249,8 @@ ParseResult!DType parseFront(Token[] tokens) {
 	// - primitive
 	auto primResult = parsePrimitive(tokens);
 	if (auto prim = primResult.isSuccess()) {
-		// pass it through
-		return primResult;
+		// upgrade from SimpleResult to ParseResult
+		return ParseResult!DType.makeSuccess(prim.thing, prim.loc, prim.etc);
 	} // no errors possible with parsePrimitive
 
 	// - named thing
