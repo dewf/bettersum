@@ -413,6 +413,14 @@ enum ParseTypeContext {
 ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, ParseTypeContext context) {
 	// one of:
 
+	// - pointer suffix
+	auto starResult = parseSymbol(tokens, Token.Symbol.Star);
+	if (auto star = starResult.isSuccess()) {
+		// OK, keep going
+		auto dt = new Pointer(front);
+		return parseTypeSuffix(dt, star.loc, star.etc, context);
+	}
+
 	// - array suffix (recurse on content, depending)
 	auto bracketedResult = parseBracketed(front, tokens);
 	if (auto bracketed = bracketedResult.isSuccess()) {
@@ -424,9 +432,8 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 		return bracketedResult;
 	}
 
+	// - callable, in some contexts:
 	if (context != ParseTypeContext.SingleTypeParam) { // can't process callables without parens in this context, because that's definitely not wanted
-
-		// - 'delegate' / 'function' + (args) + pure/nothrow/@safe/etc
 		// current front is return type
 		auto callableResult = parseCallable(front, tokens);
 		if (auto callable = callableResult.isSuccess()) {
@@ -519,7 +526,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("const(string delegate() pure nothrow @safe)[string] whatever"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("int**[] whatever"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }

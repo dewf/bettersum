@@ -71,6 +71,7 @@ class Visitor {
     void dynamicArray(DType elem) {}
     void staticArray(DType elem, string length) {}
     void assocArray(DType key, DType value) {}
+    void pointer(DType targetType) {}
     void callable(CallableKind kind, DType returnType, FunctionArg[] args) {}
 }
 
@@ -187,6 +188,22 @@ class AssocArray : DType {
     }
 }
 
+class Pointer : DType {
+    DType targetType;
+    this(DType targetType) {
+        this.targetType = targetType;
+    }
+    override string toString() const {
+        return format("Pointer(%s)", targetType.toString());
+    }
+    override void visit(Visitor v) => v.pointer(targetType);
+    override void prettyPrint(string prefix) {
+        writefln("%sPointer(", prefix);
+        targetType.prettyPrint(spacify(prefix ~ "  "));
+        writefln("%s)", spacify(prefix));
+    }
+}
+
 class Callable : DType {
     CallableKind kind;
     DType returnType;
@@ -210,19 +227,19 @@ class Callable : DType {
         import std.algorithm: map;
         import std.range: join;
         writefln("%sCallable(", prefix);
-        writefln("%s  kind: %s", spacify(prefix), kind.to!string);
+        writefln("%s        kind: %s", spacify(prefix), kind.to!string);
         returnType.prettyPrint(spacify(prefix) ~ "  returnType: ");
         if (args.length == 0) {
-            writefln("%s  args: [none]", spacify(prefix));
+            writefln("%s        args: [none]", spacify(prefix));
         } else {
-            writefln("%s  args: (", spacify(prefix));
+            writefln("%s        args: (", spacify(prefix));
             foreach (arg; args) {
-                arg.type.prettyPrint(format("%s    \"%s\": ", spacify(prefix), arg.name));
+                arg.type.prettyPrint(format("%s           \"%s\": ", spacify(prefix), arg.name));
             }
-            writefln("%s  )", spacify(prefix)); // end args
+            writefln("%s        )", spacify(prefix)); // end args
         }
         auto joinedAttrs = attrs.map!(attr => attr.to!string).join(", ");
-        writefln("%s  attrs: [%s]", spacify(prefix), joinedAttrs);
+        writefln("%s       attrs: [%s]", spacify(prefix), joinedAttrs);
         // end callable
         writefln("%s)", spacify(prefix));
     }
