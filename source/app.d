@@ -160,13 +160,17 @@ ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 	return ParseResult!DType.makeFail();
 }
 
-ParseResult!(DType[]) parseTypeArguments(Token[] tokens) {
+struct TypeArgsResult {
+	DType[] args;
+	bool withParens;
+}
+ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 
 	// required !
 	auto bangResult = parseSymbol(tokens, Token.Symbol.Bang);
 	if (bangResult.isFail()) {
 		// no type args ...
-		return ParseResult!(DType[]).makeFail();
+		return ParseResult!TypeArgsResult.makeFail();
 	} // error not possible for parseSymbol
 
 	// redefine for convenience
@@ -175,10 +179,11 @@ ParseResult!(DType[]) parseTypeArguments(Token[] tokens) {
 	// is it a single type?
 	auto singleTypeResult = parseType(tokens, ParseTypeContext.SingleTypeParam);
 	if (auto single = singleTypeResult.isSuccess()) {
-		return ParseResult!(DType[]).makeSuccess([single.thing], single.loc, single.etc);
+		TypeArgsResult res = { [ single.thing ], false };
+		return ParseResult!TypeArgsResult.makeSuccess(res, single.loc, single.etc);
 	} else if (auto err = singleTypeResult.isError()) {
 		// re-raise
-		return reraise!(DType[])(singleTypeResult);
+		return reraise!TypeArgsResult(singleTypeResult);
 	} // else simple failure - try parenthesized parse instead
 
 	// else is it a parenthesized list?
@@ -206,29 +211,30 @@ ParseResult!(DType[]) parseTypeArguments(Token[] tokens) {
 					} // no errors possible for symbol parsing
 
 					// else whoops
-					return ParseResult!(DType[]).makeError("missing comma in type args list", input[0].loc); // input.length > 0 branch, so should be OK
+					return ParseResult!TypeArgsResult.makeError("missing comma in type args list", input[0].loc); // input.length > 0 branch, so should be OK
 
 				} else {
 					// done reading all content - happy exit
-					return ParseResult!(DType[]).makeSuccess(types, type.loc, content.etc); // content.etc = post-parens content
+					TypeArgsResult res = { types, true };
+					return ParseResult!TypeArgsResult.makeSuccess(res, type.loc, content.etc); // content.etc = post-parens content
 				}
 
 			} else if (auto err = typeResult.isError()) {
 				// raise type-parsing error
-				return reraise!(DType[])(typeResult);
+				return reraise!TypeArgsResult(typeResult);
 			}
 
 			// else it's an error because we failed to parse a type (and didn't continue/exit first)
-			return ParseResult!(DType[]).makeError("parseTypeArguments: failed to parse a type", input[0].loc); // input.length > 0, so should be OK
+			return ParseResult!TypeArgsResult.makeError("parseTypeArguments: failed to parse a type", input[0].loc); // input.length > 0, so should be OK
 		}
 		throw new Exception("parseTypeArguments(): unreachable");
 
 	} else if (auto err = parensResult.isError()) {
 		// raise error (requires conversion)
-		return reraise!(DType[])(parensResult);
+		return reraise!TypeArgsResult(parensResult);
 	}
 	// no parens pair, fail gracefully
-	return ParseResult!(DType[]).makeFail();
+	return ParseResult!TypeArgsResult.makeFail();
 }
 
 ParseResult!DType parseFront(Token[] tokens) {
@@ -248,7 +254,7 @@ ParseResult!DType parseFront(Token[] tokens) {
 		// what about type arguments?
 		auto argsResult = parseTypeArguments(id.etc);
 		if (auto args = argsResult.isSuccess()) {
-			auto dt = new NamedThing(id.thing, args.thing);
+			auto dt = new NamedThing(id.thing, args.thing.args, args.thing.withParens);
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
@@ -539,16 +545,11 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 	return ParseResult!DType.makeFail();
 }
 
-// const const(const(int)[]) derp = [10];
-// const int[][] derp2;
-// const int[][string] yorp;
-// const(int)[const(string)] argh;
-// struct Woot(T) { T x; }
 // Woot!int[][string] delegate(string y) derp;
 
 void main()
 {
-	auto tokens = tokenize("void delegate(ref int[string] x) @safe nothrow whatever"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("Woot!int[][string] delegate(string y) derp");
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
@@ -556,7 +557,6 @@ void main()
 	// writeln("====================");
 	parseType(tokens).match!void(
 		(auto success) {
-			// writefln("DType: %s", success.thing);
 			success.thing.prettyPrint("");
 			writeln("===== remaining tokens =====");
 			foreach (t; success.etc) {

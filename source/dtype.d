@@ -68,7 +68,7 @@ class Visitor {
     void ref_(DType content) {}
     void qualified(Qualifier qual, DType content, bool scoped) {}
     void primitive(string prim) {}
-    void namedThing(string name, DType[] typeArgs) {}
+    void namedThing(string name, DType[] typeArgs, bool typeArgsWithParens) {}
     void dynamicArray(DType elem) {}
     void staticArray(DType elem, string length) {}
     void assocArray(DType key, DType value) {}
@@ -129,20 +129,23 @@ class Primitive : DType {
 class NamedThing: DType {
     string name;
     DType[] typeArgs;
-    this(string name, DType[] typeArgs = []) {
+    bool typeArgsWithParens;
+    this(string name, DType[] typeArgs = [], bool typeArgsWithParens = false) {
         this.name = name;
         this.typeArgs = typeArgs;
+        this.typeArgsWithParens = typeArgsWithParens;
     }
     override string toString() const {
         import std.array: join;
         import std.algorithm: map;
         if (typeArgs.length > 0) {
             auto joined = typeArgs.map!(ta => ta.toString()).join(",");
-            return format("NamedThing(%s!(%s))", name, joined);
+            auto args = typeArgsWithParens ? format("(%s)", joined) : joined;
+            return format("NamedThing(%s!%s)", name, args);
         }
         return format("NamedThing(%s)", name);
     }
-    override void visit(Visitor v) => v.namedThing(name, typeArgs);
+    override void visit(Visitor v) => v.namedThing(name, typeArgs, typeArgsWithParens);
     override void prettyPrint(string prefix) {
         if (typeArgs.length > 0) {
             writefln("%sNamedThing(%s![", prefix, name);
