@@ -2,6 +2,7 @@ module dtype;
 
 import std.format;
 import std.stdio;
+import std.conv: to;
 
 struct FunctionArg {
     DType type;
@@ -34,8 +35,14 @@ string callableKindToString(CallableKind kind) {
     }
 }
 
+enum Qualifier {
+    Const,
+    Immutable,
+    Shared
+}
+
 class Visitor {
-    void const_(DType content) {}
+    void qualified(Qualifier qual, DType content, bool scoped) {}
     void primitive(string prim) {}
     void namedThing(string name, DType[] typeArgs) {}
     void dynamicArray(DType elem) {}
@@ -50,17 +57,19 @@ class DType {
     abstract void prettyPrint(string prefix);
 }
 
-class Const : DType {
+class Qualified : DType {
+    Qualifier qual;
     DType content;
     bool scoped; // parenthesized
-    this(DType content, bool scoped) {
+    this(Qualifier qual, DType content, bool scoped) {
+        this.qual = qual;
         this.content = content;
         this.scoped = scoped;
     }
-    override string toString() const => format("Const(%s)", content.toString());
-    override void visit(Visitor v) => v.const_(content);
+    override string toString() const => format("%s(%s)", qual.to!string, content.toString());
+    override void visit(Visitor v) => v.qualified(qual, content, scoped);
     override void prettyPrint(string prefix) {
-        writefln("%sconst%s(", prefix, scoped ? "[scoped]" : "");
+        writefln("%s%s%s(", prefix, qual.to!string, scoped ? "[scoped]" : "");
         content.prettyPrint(spacify(prefix) ~ "  ");
         writefln("%s)", spacify(prefix));
     }

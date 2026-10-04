@@ -394,7 +394,7 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseTypeContext.Normal) {
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
-	// any leading stuff? (const/immutable/shared/etc)
+	// any leading qualifiers?
 
 	auto constResult = parseKeyword(tokens, "const");
 	if (auto constSucc = constResult.isSuccess()) {
@@ -407,7 +407,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 			auto contentTypeResult = parseType(parenContent.thing);
 			if (auto contentType = contentTypeResult.isSuccess()) {
 
-				auto dt = new Const(contentType.thing, true);
+				auto dt = new Qualified(Qualifier.Const, contentType.thing, true);
 				// that's now our 'front', now process suffix (after parens)
 				return parseTypeSuffix(dt, parenContent.loc, parenContent.etc, context);
 
@@ -429,7 +429,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 			auto constContentResult = parseType(constSucc.etc, context);
 			if (auto content = constContentResult.isSuccess()) {
 
-				auto dt = new Const(content.thing, false);
+				auto dt = new Qualified(Qualifier.Const, content.thing, false);
 				return ParseResult!DType.makeSuccess(dt, content.loc, content.etc);
 
 			} else if (auto err = constContentResult.isError()) {
@@ -468,7 +468,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 void main()
 {
-	auto tokens = tokenize("Woot!const(int[][string]) delegate(string y)"); // const int[string] function(const(float) x)
+	auto tokens = tokenize("Woot!const(int[][string]) delegate(string y) yoooooo"); // const int[string] function(const(float) x)
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
