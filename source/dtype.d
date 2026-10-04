@@ -73,7 +73,7 @@ class Visitor {
     void staticArray(DType elem, string length) {}
     void assocArray(DType key, DType value) {}
     void pointer(DType targetType) {}
-    void callable(CallableKind kind, DType returnType, FunctionArg[] args) {}
+    void callable(CallableKind kind, DType returnType, FunctionArg[] args, FunctionAttr[] attrs) {}
 }
 
 class DType {
@@ -240,7 +240,7 @@ class Callable : DType {
         auto joinedAttrs = attrs.map!(attr => attr.to!string).join(", ");
         return format("Callable(kind: %s, returns: %s, args: [%s], attrs: [%s])", kind.to!string, returnType.toString(), joinedArgs, joinedAttrs);
     }
-    override void visit(Visitor v) => v.callable(kind, returnType, args);
+    override void visit(Visitor v) => v.callable(kind, returnType, args, attrs);
     override void prettyPrint(string prefix) {
         import std.algorithm: map;
         import std.range: join;
@@ -261,4 +261,114 @@ class Callable : DType {
         // end callable
         writefln("%s)", spacify(prefix));
     }
+}
+
+class Renderer : Visitor {
+    string output;
+    override void ref_(DType content) {
+        output ~= "ref ";
+        content.visit(this);
+    }
+    override void qualified(Qualifier qual, DType content, bool scoped) {
+        final switch (qual) {
+            case Qualifier.Const:
+                output ~= "const";
+                break;
+            case Qualifier.Immutable:
+                output ~= "immutable";
+                break;
+            case Qualifier.Shared:
+                output ~= "shared";
+                break;
+        }
+        if (scoped) {
+            output ~= "(";
+        } else {
+            output ~= " ";
+        }
+        content.visit(this);
+        if (scoped) {
+            output ~= ")";
+        }
+    }
+    override void primitive(string prim) {
+        output ~= prim;
+    }
+    override void namedThing(string name, DType[] typeArgs, bool typeArgsWithParens) {
+        import std.range: enumerate;
+        output ~= name;
+        if (typeArgs.length > 0) {
+            output ~= "!";
+            if (typeArgsWithParens) {
+                output ~= "(";
+            }
+            foreach (i, ta; typeArgs.enumerate()) {
+                if (i != 0) output ~= ",";
+                ta.visit(this);
+            }
+            if (typeArgsWithParens) {
+                output ~= ")";
+            }
+        }
+    }
+    override void dynamicArray(DType elem) {
+        elem.visit(this);
+        output ~= "[]";
+    }
+    override void staticArray(DType elem, string length) {
+        elem.visit(this);
+        output ~= format("[%d]", length);
+    }
+    override void assocArray(DType key, DType value) {
+        value.visit(this);
+        output ~= "[";
+        key.visit(this);
+        output ~= "]";
+    }
+    override void pointer(DType targetType) {
+        targetType.visit(this);
+        output ~= "*";
+    }
+    override void callable(CallableKind kind, DType returnType, FunctionArg[] args, FunctionAttr[] attrs) {
+        import std.range: enumerate;
+        returnType.visit(this);
+        final switch (kind) {
+            case CallableKind.Function:
+                output ~= " function(";
+                break;
+            case CallableKind.Delegate:
+                output ~= " delegate(";
+                break;
+        }
+        foreach (i, arg; args) {
+            if (i != 0) output ~= ", ";
+            arg.type.visit(this);
+            if (arg.name !is null) {
+                output ~= " " ~ arg.name;
+            }
+        }
+        output ~= ")";
+        foreach (attr; attrs) {
+            final switch (attr) with (FunctionAttr) {
+                case Pure:
+                    output ~= " pure";
+                    break;
+                case NoThrow:
+                    output ~= " nothrow";
+                    break;
+                case Safe:
+                    output ~= " @safe";
+                    break;
+                case NoGC:
+                    output ~= " @nogc";
+                    break;
+            }
+        }
+    }
+}
+
+string renderToString(DType type) {
+    auto renderer = new Renderer();
+    type.visit(renderer);
+    return renderer.output;
 }

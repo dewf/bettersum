@@ -3,10 +3,17 @@ import std.format;
 
 import tokenizer;
 import typeparser: parseType;
+import dtype: renderToString;
+
+struct Woot(T) {
+	T x;
+}
+
+const shared string[int][void delegate(Woot!int x) nothrow @safe] derp;
 
 void main()
 {
-	auto tokens = tokenize("Woot!int[][string] delegate(ref string y) derp");
+	auto tokens = tokenize("const shared string[int][void delegate(Woot!int x) nothrow @safe] derp");
 	// foreach (t; tokens) {
 	// 	writefln("token: %s", t);
 	// }
@@ -19,6 +26,8 @@ void main()
 			foreach (t; success.etc) {
 				writefln(" - %s", t);
 			}
+			writeln("============================");
+			writefln("output: { %s }", renderToString(success.thing));
 		},
 		(auto fail) {
 			writefln("failed to parse a type");
