@@ -466,8 +466,33 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
 	// we can short circuit all this ...
-	if (auto lit = tryToken(tokens, 0, t => t.isTypeLiteral())) {
+	if (auto lit = tryToken(tokens, 0, t => t.isBackticked())) {
 		return ParseResult!DType.makeSuccess(new TypeLiteral(*lit), tokens[0].loc, tokens[1..$]);
+	}
+
+	auto typeofResult = parseKeyword(tokens, "typeof");
+	if (auto typeof_ = typeofResult.isSuccess()) {
+		auto contentResult = parseBetween(typeof_.etc, Token.Symbol.LeftParen, Token.Symbol.RightParen);
+		if (auto content = contentResult.isSuccess()) {
+
+			if (content.thing.length == 0) {
+				return ParseResult!DType.makeError("typeof() is empty", content.loc);
+			}
+
+			// we can't do full D expression parsing, so the inner content needs to be a backticked literal
+			if (auto bt = tryToken(content.thing, 0, t => t.isBackticked)) {
+				return ParseResult!DType.makeSuccess(new TypeOf(*bt), content.loc, content.etc);
+			}
+
+			// else, error - we could try joining together all the tokens with no spaces, but I don't think that's a good policy
+			return ParseResult!DType.makeError("typeof() content must be backticked D expression", content.loc);
+		}
+		 else if (auto err = contentResult.isError()) {
+			return reraise!DType(err.message, err.loc);
+		}
+
+		// else 'typeof' without paren content - also an error
+		return ParseResult!DType.makeError("'typeof' with content", typeof_.loc);
 	}
 
 	// check for 'ref' regardless, but it's only allowed in some contexts

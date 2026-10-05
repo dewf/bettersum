@@ -75,6 +75,7 @@ class Visitor {
     void assocArray(DType key, DType value) {}
     void pointer(DType targetType) {}
     void callable(CallableKind kind, DType returnType, FunctionArg[] args, FunctionAttr[] attrs) {}
+    void typeOf(string expression) {}
 }
 
 class DType {
@@ -276,8 +277,25 @@ class Callable : DType {
     }
 }
 
+class TypeOf : DType {
+    string expression;
+    this(string expression) {
+        this.expression = expression;
+    }
+    override string toString() const {
+        return format("TypeOf(%s)", expression);
+    }
+    override void visit(Visitor v) => v.typeOf(expression);
+    override void prettyPrint(string prefix) {
+        writefln("%sTypeOf(%s)", prefix);
+    }
+}
+
 class Renderer : Visitor {
     string output;
+    override void typeLiteral(string literal) {
+        output ~= literal;
+    }
     override void ref_(DType content) {
         output ~= "ref ";
         content.visit(this);
@@ -378,8 +396,8 @@ class Renderer : Visitor {
             }
         }
     }
-    override void typeLiteral(string literal) {
-        output ~= literal;
+    override void typeOf(string expression) {
+        output ~= "typeof(" ~ expression ~ ")";
     }
 }
 

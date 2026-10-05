@@ -116,7 +116,7 @@ Token[] classify(Chunk[] chunks) {
 		} else if (isIdentifier(ch.str)) {
 			result ~= Token.mkIdentifier(ch);
 		} else if (isBackticked(ch.str)) {
-			result ~= Token.mkTypeLiteral(ch);
+			result ~= Token.mkBackticked(ch);
 		}
 		else {
 			throw new Exception("could not classify lexed chunk: [" ~ ch.str ~ "]");
@@ -151,7 +151,7 @@ struct Token {
 		Identifier,
 		Numeric,
 		Symbol,
-		TypeLiteral
+		Backticked
 	}
 	enum Symbol {
 		Bang,
@@ -229,12 +229,12 @@ struct Token {
 		return null;
 	}
 
-	static Token mkTypeLiteral(Chunk ch) {
+	static Token mkBackticked(Chunk ch) {
 		Content c = { text: ch.str[1..$-1] }; // strip backticks
-		return Token(Tag.TypeLiteral, c, Location(ch));
+		return Token(Tag.Backticked, c, Location(ch));
 	}
-	const(string)* isTypeLiteral() {
-		if (tag == Tag.TypeLiteral) {
+	const(string)* isBackticked() {
+		if (tag == Tag.Backticked) {
 			return &content.text;
 		}
 		return null;
@@ -254,8 +254,8 @@ struct Token {
 				return format("Numeric(%s)%s", content.text, loc);
 			case Tag.Symbol:
 				return format("Symbol(%s)%s", content.symbol.to!string, loc);
-			case Tag.TypeLiteral:
-				return format("TypeLiteral(%s)%s", content.text, loc);
+			case Tag.Backticked:
+				return format("Backticked(%s)%s", content.text, loc);
 		}
 	}
 }
