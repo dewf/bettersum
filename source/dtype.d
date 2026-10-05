@@ -428,3 +428,4 @@ string renderToString(DType type) {
     type.visit(renderer);
     return renderer.output;
 }
+// string renderToString(DType* type) => renderToString(*type);

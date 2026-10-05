@@ -522,6 +522,8 @@ unittest {
 	assert(verifyParse(q{ulong[string]}));
 	assert(verifyParse(q{Woot!(void function(ref const int[]))[string]}));
 	assert(verifyParse(q{const shared string[int]*[void delegate(Woot!int x) nothrow @safe]}));
+	assert(verifyParse(q{Woot!Something[]}));
+	assert(verifyParse(q{Woot!(Something[])}));
 
     assert(verifyParse(q{string[10_000]}));
     assert(verifyParse(q{int}));
