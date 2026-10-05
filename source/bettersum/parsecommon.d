@@ -1,6 +1,8 @@
-module parsecommon;
+module bettersum.parsecommon;
 
-import tokenizer;
+import bettersum.tokenizer;
+
+// TODO: remove
 import stonesoup.unit;
 import stonesoup.sumtype;
 

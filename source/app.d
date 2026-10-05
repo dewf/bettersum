@@ -1,25 +1,29 @@
 import std.stdio;
 import std.format;
 
-import parser;
-import renderer;
+import bettersum: sumtype;
 
-enum Example = q{
+mixin(sumtype(q{
 Wondrous {
 	Thing1,
 	Thing2(int[] x),
 	Thing3(string y)
 }
-};
+}));
 
 void main()
 {
-	auto defResult = parseSumType(Example);
-	if (auto def = defResult.isSuccess()) {
-		writeln(renderSumType(def.thing));
-	} else if (auto err = defResult.isError()) {
-		writefln("parse error: [%s]%s", err.message, err.loc);
-	} else {
-		writefln("simply failed to parse");
+	auto x =
+		// Wondrous.makeThing1();
+		// Wondrous.makeThing2([1, 2, 3, 4, 5]);
+		Wondrous.makeThing3("helllooo");
+
+	if (auto thing1 = x.isThing1()) {
+		writefln("is thing 1!");
+	} else if (auto thing2 = x.isThing2()) {
+		writefln("thing2: %s", thing2.x);
+	} else if (auto thing3 = x.isThing3()) {
+		writefln("thing3: [%s]", thing3.y);
 	}
+	static assert(Wondrous.isExhaustive(q{Thing1, Thing2, Thing3}));
 }

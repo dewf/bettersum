@@ -1,8 +1,8 @@
-module typeparser;
+module bettersum.typeparser;
 
-import parsecommon;
-import tokenizer;
-import dtype;
+import bettersum.parsecommon;
+import bettersum.tokenizer;
+import bettersum.dtype;
 
 SimpleResult!DType parsePrimitive(Token[] tokens) {
 	if (auto prim = tryToken(tokens, 0, t => t.isPrimitive())) {

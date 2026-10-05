@@ -1,4 +1,4 @@
-module dtype;
+module bettersum.dtype;
 
 import std.format;
 import std.stdio;

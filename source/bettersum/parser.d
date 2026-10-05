@@ -1,10 +1,11 @@
-module parser;
+module bettersum.parser;
 
-import tokenizer;
-import parsecommon;
-import typeparser;
-import dtype;
+import bettersum.tokenizer;
+import bettersum.parsecommon;
+import bettersum.typeparser;
+import bettersum.dtype;
 
+// TODO: remove
 import stonesoup.sumtype: sumtype;
 
 enum CommaOrEnd {

@@ -1,52 +1,55 @@
-module tokenizer;
+module bettersum.tokenizer;
 
-import lexer;
-import util;
+import bettersum.lexer;
+import bettersum.util;
 
 private:
 
+immutable auto knownKeywords = setFromItems!string([
+	// storage:
+	"ref",
+	// type qualifiers:
+	"const", "immutable", "shared", "inout",
+	// callables:
+	"function", "delegate",
+	// function type attrs:
+	"pure", "nothrow",
+	// function type attrs (@ prefix)
+	"safe", "nogc",
+	// misc
+	"typeof"
+]);
+
+immutable auto knownPrimitives = setFromItems!string([
+	"void", "bool", "byte", "ubyte", "short", "ushort", "int", "uint", "long", "ulong", "cent", "ucent", "float",
+	"double", "real", "ifloat", "idouble", "ireal", "cfloat", "cdouble", "creal", "char", "wchar", "dchar",
+	"string"
+]);
+
+immutable auto symbolMap = [
+	"!": Token.Symbol.Bang,
+	".": Token.Symbol.Dot,
+	",": Token.Symbol.Comma,
+	"(": Token.Symbol.LeftParen,
+	")": Token.Symbol.RightParen,
+	"[": Token.Symbol.LeftBracket,
+	"]": Token.Symbol.RightBracket,
+	"*": Token.Symbol.Star,
+	"@": Token.Symbol.At,
+	"{": Token.Symbol.LeftBrace,
+	"}": Token.Symbol.RightBrace
+];
+
 bool isKeyword(string str) {
-	static known = setFromItems!string([
-		// storage:
-		"ref",
-		// type qualifiers:
-		"const", "immutable", "shared", "inout",
-		// callables:
-		"function", "delegate",
-		// function type attrs:
-		"pure", "nothrow",
-		// function type attrs (@ prefix)
-		"safe", "nogc",
-		// misc
-		"typeof"
-	]);
-	return (str in known) != null;
+	return (str in knownKeywords) != null;
 }
 
 bool isPrimitive(string str) {
-	static known = setFromItems!string([
-		"void", "bool", "byte", "ubyte", "short", "ushort", "int", "uint", "long", "ulong", "cent", "ucent", "float",
-		"double", "real", "ifloat", "idouble", "ireal", "cfloat", "cdouble", "creal", "char", "wchar", "dchar",
-		"string"
-	]);
-	return (str in known) != null;
+	return (str in knownPrimitives) != null;
 }
 
 bool isSymbol(string str, out Token.Symbol sym) {
-	static auto map = [
-		"!": Token.Symbol.Bang,
-		".": Token.Symbol.Dot,
-		",": Token.Symbol.Comma,
-		"(": Token.Symbol.LeftParen,
-		")": Token.Symbol.RightParen,
-		"[": Token.Symbol.LeftBracket,
-		"]": Token.Symbol.RightBracket,
-		"*": Token.Symbol.Star,
-		"@": Token.Symbol.At,
-		"{": Token.Symbol.LeftBrace,
-		"}": Token.Symbol.RightBrace
-	];
-	if (auto found = str in map) {
+	if (auto found = str in symbolMap) {
 		sym = *found;
 		return true;
 	}

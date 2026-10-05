@@ -1,12 +1,12 @@
-module renderer;
+module bettersum.renderer;
+
+import bettersum.parser;
+import bettersum.dtype;
 
 import std.array : appender, join;
 import std.ascii: toUpper, toLower;
 import std.algorithm: map;
 import std.format: format;
-
-import parser;
-import dtype;
 
 string upperFirst(string s) {
 	if (!s || s.length == 0) return s;

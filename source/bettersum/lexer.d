@@ -1,6 +1,7 @@
-module lexer;
+module bettersum.lexer;
 
-import util;
+import bettersum.util;
+import stonesoup.unit: Unit;
 
 private:
 
@@ -42,9 +43,10 @@ bool alphaNumeric(string input, out string value) {
 	return false;
 }
 
+immutable auto knownSymbols = setFromItems!char(['!', '.', ',', '(', ')', '[', ']', '*', '@', '{', '}']);
+
 bool symbol(string input, out string value) {
-	static auto known = setFromItems!char(['!', '.', ',', '(', ')', '[', ']', '*', '@', '{', '}']);
-	if (input.length > 0 && input[0] in known) {
+	if (input.length > 0 && input[0] in knownSymbols) {
 		value = [input[0]];
 		return true;
 	}
