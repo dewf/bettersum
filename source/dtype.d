@@ -330,7 +330,7 @@ class Renderer : Visitor {
     }
     override void staticArray(DType elem, string length) {
         elem.visit(this);
-        output ~= format("[%d]", length);
+        output ~= format("[%s]", length);
     }
     override void assocArray(DType key, DType value) {
         value.visit(this);
