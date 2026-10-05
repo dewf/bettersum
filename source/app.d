@@ -7,9 +7,11 @@ mixin(sumtype(q{
 Wondrous {
 	Thing1,
 	Thing2(int[] x),
-	Thing3(string y)
+	Thing3(string)
 }
 }));
+	// broken!!!
+	// Thing5(int, string, int)
 
 void main()
 {
@@ -20,10 +22,13 @@ void main()
 
 	if (auto thing1 = x.isThing1()) {
 		writefln("is thing 1!");
+
 	} else if (auto thing2 = x.isThing2()) {
 		writefln("thing2: %s", thing2.x);
+
 	} else if (auto thing3 = x.isThing3()) {
-		writefln("thing3: [%s]", thing3.y);
+		writefln("thing3: [%s]", *thing3);
 	}
+
 	static assert(Wondrous.isExhaustive(q{Thing1, Thing2, Thing3}));
 }
