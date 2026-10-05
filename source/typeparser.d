@@ -629,3 +629,96 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 
 	return ParseResult!DType.makeFail();
 }
+
+unittest {
+	import std.string: replace;
+
+	bool verifyParse(string input) {
+		auto tokens = tokenize(input);
+		return parseType(tokens).match!bool(
+			(auto success) {
+				auto compareWith = input.replace("`", ""); // strip out backticks for the purpose of comparison
+				auto rendered = success.thing.renderToString();
+				return rendered == compareWith;
+			},
+			(auto fail) {
+				return false; // failed to parse type, no over errors
+			},
+			(auto error) {
+				return false; // active error
+			}
+		);
+	}
+
+	assert(verifyParse(q{int}));
+	assert(verifyParse(q{int[]}));
+	assert(verifyParse(q{ulong[string]}));
+	assert(verifyParse(q{Woot!(void function(ref const int[]))[string]}));
+	assert(verifyParse(q{const shared string[int]*[void delegate(Woot!int x) nothrow @safe]}));
+
+    assert(verifyParse(q{string[10_000]}));
+    assert(verifyParse(q{int}));
+    assert(verifyParse(q{string}));
+    assert(verifyParse(q{uint}));
+    assert(verifyParse(q{long}));
+    assert(verifyParse(q{double}));
+    assert(verifyParse(q{char}));
+
+    assert(verifyParse(q{int*}));
+    assert(verifyParse(q{int**}));
+    assert(verifyParse(q{int[]}));
+    assert(verifyParse(q{int[10]}));
+    assert(verifyParse(q{int[10][20]}));
+    assert(verifyParse(q{int[string]}));
+
+    assert(verifyParse(q{const(int)}));
+    assert(verifyParse(q{immutable(int)}));
+    assert(verifyParse(q{shared(int)}));
+    assert(verifyParse(q{const(int*)}));
+    assert(verifyParse(q{immutable(int[])}));
+    assert(verifyParse(q{const(int[int])}));
+    assert(verifyParse(q{shared(const(int*))}));
+    assert(verifyParse(q{const(immutable(int*))}));
+
+    assert(verifyParse(q{int function()}));
+    assert(verifyParse(q{int function(int)}));
+    assert(verifyParse(q{int function(int, string)}));
+    assert(verifyParse(q{int delegate(int)}));
+    assert(verifyParse(q{void function(int, double)}));
+    assert(verifyParse(q{int* function(int*)}));
+    assert(verifyParse(q{int[] function(int[int])}));
+    assert(verifyParse(q{int function(int function(int))}));
+
+    assert(verifyParse(q{int**[]}));
+    assert(verifyParse(q{int[][10]}));
+    assert(verifyParse(q{int[10][]}));
+    assert(verifyParse(q{int[int[]]}));
+    assert(verifyParse(q{int[][int]}));
+    assert(verifyParse(q{const(int*)[]}));
+    assert(verifyParse(q{const(int[]*)}));
+    assert(verifyParse(q{immutable(int[int])*}));
+    assert(verifyParse(q{shared(const(int**[]))}));
+    assert(verifyParse(q{int function(int*)[]}));
+    assert(verifyParse(q{int[] function(int[int])}));
+    assert(verifyParse(q{int function(int function(int*), int[])}));
+
+    assert(verifyParse(q{const(int*[])[10]}));
+    assert(verifyParse(q{immutable(int[int[]])*}));
+    assert(verifyParse(q{int function(int function(int)[], int[int]*)}));
+    assert(verifyParse(q{const(int function(int*)[])}));
+    assert(verifyParse(q{int[] function(int[] function(int*))}));
+    assert(verifyParse(q{shared(const(immutable(int**[])))[10]}));
+    assert(verifyParse(q{int function(int function(int function(int)))}));
+    assert(verifyParse(q{int[int[]][10]}));
+    assert(verifyParse(q{const(int function(int[int])*)}));
+    assert(verifyParse(q{int function(const(int*)[], immutable(int[int])*)[]}));
+
+    assert(verifyParse(q{int[string]}));
+    assert(verifyParse(q{const(int[])}));
+    assert(verifyParse(q{const(const int[])}));
+    assert(verifyParse(q{foo!(int,string)[]}));
+    assert(verifyParse(q{const(int delegate(int) pure nothrow[])}));
+    assert(verifyParse(q{typeof(`foo!(T).bar`)}));
+    assert(verifyParse(q{int function(int, int) pure nothrow @safe}));
+    assert(verifyParse(q{const(thing1.thing2.Woot!int.Subwoot)[]}));
+}
