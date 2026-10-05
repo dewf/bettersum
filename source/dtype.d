@@ -76,6 +76,7 @@ class Visitor {
     void pointer(DType targetType) {}
     void callable(CallableKind kind, DType returnType, FunctionArg[] args, FunctionAttr[] attrs) {}
     void typeOf(string expression) {}
+    void nested(DType parent, DType child) {}
 }
 
 class DType {
@@ -101,7 +102,7 @@ class Ref : DType {
     this(DType content) {
         this.content = content;
     }
-    override string toString() const => format("Ref(%s)", content.toString());
+    override string toString() const => format("Ref(%s)", content);
     override void visit(Visitor v) => v.ref_(content);
     override void prettyPrint(string prefix) {
         writefln("%sRef(", prefix);
@@ -119,7 +120,7 @@ class Qualified : DType {
         this.content = content;
         this.scoped = scoped;
     }
-    override string toString() const => format("%s(%s)", qual.to!string, content.toString());
+    override string toString() const => format("%s(%s)", qual.to!string, content);
     override void visit(Visitor v) => v.qualified(qual, content, scoped);
     override void prettyPrint(string prefix) {
         writefln("%s%s%s(", prefix, qual.to!string, scoped ? "[scoped]" : "");
@@ -291,6 +292,22 @@ class TypeOf : DType {
     }
 }
 
+class Nested : DType {
+    DType parent, child;
+    this(DType parent, DType child) {
+        this.parent = parent;
+        this.child = child;
+    }
+    override string toString() const => format("Nested(%s:%s)", parent, child);
+    override void visit(Visitor v) => v.nested(parent, child);
+    override void prettyPrint(string prefix) {
+        writefln("%sNested(", prefix);
+        parent.prettyPrint(spacify(prefix) ~ "  parent:");
+        child.prettyPrint(spacify(prefix) ~ "  child:");
+        writefln("%s)", spacify(prefix));
+    }
+}
+
 class Renderer : Visitor {
     string output;
     override void typeLiteral(string literal) {
@@ -398,6 +415,11 @@ class Renderer : Visitor {
     }
     override void typeOf(string expression) {
         output ~= "typeof(" ~ expression ~ ")";
+    }
+    override void nested(DType parent, DType child) {
+        parent.visit(this);
+        output ~= ".";
+        child.visit(this);
     }
 }
 

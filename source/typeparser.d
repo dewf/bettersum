@@ -26,7 +26,7 @@ ParseResult!T reraise(T)(string message, Location loc) {
 }
 
 T tryToken(T)(Token[] input, int index, T delegate(Token*) func) { // delegate arg must be pointer/ref! otherwise it's a Token copy, and the .isWhatever methods will return pointers to temporary locations! memory corruption galore
-	if (input.length > index) {
+	if (index < input.length) {
 		return func(&input[index]);
 	}
 	return T.init;
@@ -74,6 +74,36 @@ SimpleResult!Unit parseSymbol(Token[] tokens, Token.Symbol which) {
 SimpleResult!string parseIdentifier(Token[] tokens) {
 	if (auto id = tryToken(tokens, 0, t => t.isIdentifier())) {
 		return SimpleResult!string.makeSuccess(*id, tokens[0].loc, tokens[1..$]);
+	}
+	return SimpleResult!string.makeFail();
+}
+
+SimpleResult!string parseQualifiedName(Token[] tokens) {
+	string[] parts;
+	int i;
+	while (i < tokens.length) {
+		if (auto id = tryToken(tokens, i, t => t.isIdentifier())) {
+			parts ~= *id;
+			i++;
+
+			// if there's a '.' following, we can continue
+			if (auto sym = tryToken(tokens, i, t => t.isSymbol())) {
+				if (*sym == Token.Symbol.Dot) {
+					// cool, continue
+					i++;
+					continue;
+				}
+				// something other than dot, fall through
+			}
+			// no symbol found, fall through
+		}
+		// no identifier - time to stop
+		break;
+	}
+	if (parts.length > 0) {
+		import std.range: join;
+		auto joined = parts.join(".");
+		return SimpleResult!string.makeSuccess(joined, tokens[0].loc, tokens[i..$]);
 	}
 	return SimpleResult!string.makeFail();
 }
@@ -254,23 +284,23 @@ ParseResult!DType parseFront(Token[] tokens) {
 	} // no errors possible with parsePrimitive
 
 	// - named thing
-	auto idResult = parseIdentifier(tokens);
-	if (auto id = idResult.isSuccess()) {
+	auto nameResult = parseQualifiedName(tokens);
+	if (auto name = nameResult.isSuccess()) {
 
 		// what about type arguments?
-		auto argsResult = parseTypeArguments(id.etc);
+		auto argsResult = parseTypeArguments(name.etc);
 		if (auto args = argsResult.isSuccess()) {
-			auto dt = new NamedThing(id.thing, args.thing.args, args.thing.withParens);
+
+			auto dt = new NamedThing(name.thing, args.thing.args, args.thing.withParens);
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
-			// raise error (requires conversion)
 			return reraise!DType(err.message, err.loc);
 		}
 
 		// else no type args - no worries
-		auto dt = new NamedThing(id.thing);
-		return ParseResult!DType.makeSuccess(dt, id.loc, id.etc);
+		auto dt = new NamedThing(name.thing);
+		return ParseResult!DType.makeSuccess(dt, name.loc, name.etc);
 	}
 
 	// else we didn't find what we needed
@@ -445,6 +475,23 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 		return bracketedResult;
 	}
 
+	// - dot suffix (named thing contained by front type)
+	auto dotResult = parseSymbol(tokens, Token.Symbol.Dot);
+	if (auto dot = dotResult.isSuccess()) {
+		auto nestedResult = parseType(dot.etc, context); // do we need a new context for nested stuff?
+		if (auto nested = nestedResult.isSuccess()) {
+
+			// front + [front + [front + nested]]
+			auto dt = new Nested(front, nested.thing);
+			return parseTypeSuffix(dt, nested.loc, nested.etc, context);
+
+		} else if (auto err = nestedResult.isError()) {
+			return reraise!DType(err.message, err.loc);
+		}
+		// if dot existed, had to be followed with type
+		return ParseResult!DType.makeError("dot (.) not followed by type", dot.loc);
+	}
+
 	// - callable, in some contexts:
 	if (context != ParseTypeContext.SingleTypeParam) { // can't process callables without parens in this context, because that's definitely not wanted
 		// current front is return type
@@ -465,11 +512,12 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseTypeContext.Normal) {
 	if (tokens.length == 0) return ParseResult!DType.makeFail();
 
-	// we can short circuit all this ...
+	// backticked type literal?
 	if (auto lit = tryToken(tokens, 0, t => t.isBackticked())) {
 		return ParseResult!DType.makeSuccess(new TypeLiteral(*lit), tokens[0].loc, tokens[1..$]);
 	}
 
+	// typeof(`...`) expression (note the backticks)
 	auto typeofResult = parseKeyword(tokens, "typeof");
 	if (auto typeof_ = typeofResult.isSuccess()) {
 		auto contentResult = parseBetween(typeof_.etc, Token.Symbol.LeftParen, Token.Symbol.RightParen);
@@ -495,7 +543,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 		return ParseResult!DType.makeError("'typeof' with content", typeof_.loc);
 	}
 
-	// check for 'ref' regardless, but it's only allowed in some contexts
+	// 'ref' (if allowed in this context)
 	auto refResult = parseKeyword(tokens, "ref");
 	if (auto ref_ = refResult.isSuccess()) {
 		if (context != ParseTypeContext.FunctionArgs) {
@@ -518,6 +566,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 		return ParseResult!DType.makeError("parsing 'ref' content: no subsequent type", ref_.loc);
 	}
 
+	// type qualifiers:
 	auto qualResult = parseOneOfKeywords(tokens, ["const", "immutable", "shared"]);
 	if (auto qualifier = qualResult.isSuccess()) {
 

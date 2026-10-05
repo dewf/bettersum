@@ -90,7 +90,7 @@ string[] examples = [
     q{const(int delegate(int) pure nothrow[])},
     q{typeof(`foo!(T).bar`)},
     q{int function(int, int) pure nothrow @safe},
-    // q{const(Woot!int.Subwoot)[])},
+    q{const(thing1.thing2.Woot!int.Subwoot)[]},
 ];
 
 void main()
@@ -113,8 +113,8 @@ void main()
 				assert(0, "failed to parse a type");
 			},
 			(auto error) {
+				writefln("parse error: { %s } %s", error.message, error.loc);
 				assert(0, "error parsing type");
-				// writefln("parse error: { %s } %s", error.message, error.loc);
 			}
 		);
 	}
