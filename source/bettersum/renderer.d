@@ -30,7 +30,7 @@ string caseContentType(Case c) {
 	return c.payload.match!string(
 		(auto nameOnly) => throw new Exception("caseContentType() called with 'NameOnly' payload"),
 		(auto singleType) => singleType.renderToString(),
-		(auto namedArgs) => c.name.upperFirst() // struct name
+		(auto namedArgs) => "_" ~ c.name.upperFirst() // struct name
 	);
 }
 
@@ -43,7 +43,8 @@ string caseTagName(Case c) {
 }
 
 string caseGetterName(Case c) {
-	return c.name.lowerFirst();
+	return c.name;
+	// return c.name.lowerFirst();
 }
 
 string caseFuncName(Case c) {
@@ -71,7 +72,7 @@ string renderSumType(SumTypeDef def)
 			output ~= format("    // %s: name only\n", caseSpecName(c));
 		} else if (auto single = c.payload.isSingleType()) {
 			// nothing to output, tag + string field in Content
-			output ~= format("    // %s: name+type only, no fields\n", caseSpecName(c));
+			output ~= format("    // %s: name + single type, no fields\n", caseSpecName(c));
 		} else if (auto namedArgs = c.payload.isNamedArgs()) {
 			auto fields = (*namedArgs).map!(arg => format("%s %s;", arg.type.renderToString(), arg.name)).join(" ");
 			output ~= format("    struct %s { %s }\n", caseContentType(c), fields);
@@ -117,7 +118,7 @@ string renderSumType(SumTypeDef def)
 				(auto singleType) => format("%s value", singleType.renderToString()),
 				(auto namedArgs) => namedArgs.map!(arg => format("%s %s", arg.type.renderToString(), arg.name)).join(", ")
 			);
-		output ~= format("    static %s make%s(%s) {\n", sumTypeName(def), caseSpecName(c), ctorParams);
+		output ~= format("    static %s %s(%s) {\n", sumTypeName(def), caseSpecName(c), ctorParams);
 
 		if (c.payload.isNameOnly()) {
 			output ~= "        Content c;\n";
@@ -142,7 +143,7 @@ string renderSumType(SumTypeDef def)
 				// "is" checker+getter
 				output ~= format("    %s* is%s() => _tag == Tag.%s ? &content.%s : null;\n", caseContentType(c), caseSpecName(c), caseTagName(c), caseFieldName(c));
 				// force-getter
-				output ~= format("    ref %s %s() {\n", caseContentType(c), caseGetterName(c));
+				output ~= format("    ref %s get%s() {\n", caseContentType(c), caseGetterName(c));
 				output ~= format("        enforce(_tag == Tag.%s, \"%s.%s(): tag doesn't match\");\n", caseTagName(c), sumTypeName(def), caseGetterName(c));
 				output ~= format("        return content.%s;\n", caseFieldName(c));
 				output ~= "    }\n";
