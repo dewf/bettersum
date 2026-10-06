@@ -161,6 +161,9 @@ struct Location {
 		import std.format;
 		return format("[%d:%d]", line, col);
 	}
+	Location plusCols(ulong cols) {
+		return Location(line, col + cast(int) cols);
+	}
 }
 
 struct Token {
@@ -257,6 +260,32 @@ struct Token {
 			return &content.text;
 		}
 		return null;
+	}
+
+	static int symbolWidth(Symbol sym) {
+		with (Symbol)
+		final switch (sym) {
+			case Bang, Dot, Comma, LeftParen, RightParen, LeftBracket, RightBracket, Star, At, LeftBrace, RightBrace:
+				return 1;
+		}
+	}
+
+	Location endLoc() {
+		with (Tag)
+		final switch (tag) {
+			case Primitive:
+				return loc.plusCols(content.text.length);
+			case Keyword:
+				return loc.plusCols(content.text.length);
+			case Identifier:
+				return loc.plusCols(content.text.length);
+			case Numeric:
+				return loc.plusCols(content.text.length);
+			case Symbol:
+				return loc.plusCols(symbolWidth(content.symbol));
+			case Backticked:
+				return loc.plusCols(1 + content.text.length + 1);
+		}
 	}
 
 	string toString() const {

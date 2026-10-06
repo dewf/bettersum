@@ -163,6 +163,7 @@ ParseResult!(Case[]) parseCases(Token[] input, Location loc) {
 	Location lastLoc = loc;
 
 	while (input.length > 0) {
+
 		auto caseResult = parseCase(input);
 		if (auto case_ = caseResult.isSuccess()) {
 			cases ~= case_.thing;
@@ -178,10 +179,13 @@ ParseResult!(Case[]) parseCases(Token[] input, Location loc) {
 				// missing required comma/end
 				return ParseResult!(Case[]).makeError("missing comma/block end after case", case_.loc);
 			}
+
 		} else if (auto err = caseResult.isError()) {
 			return makeError!(Case[])(err.message, err.loc);
 		}
-		// else failed to parse a case - fall through to below (kinda seems like it should be an error, though)
+
+		// else failed to parse a case before input has run out - probably encountered some weirdness
+		return ParseResult!(Case[]).makeError("non-case content encountered", lastLoc);
 	}
 	if (cases.length > 0) {
 		return ParseResult!(Case[]).makeSuccess(cases, lastLoc, input);
