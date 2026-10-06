@@ -2,6 +2,7 @@ module bettersum.renderer;
 
 import bettersum.parser;
 import bettersum.dtype;
+import bettersum.options;
 
 import std.array : appender, join;
 import std.ascii: toUpper, toLower;
@@ -51,7 +52,7 @@ string caseFuncName(Case c) {
 	return c.name.lowerFirst();
 }
 
-string renderSumType(SumTypeDef def)
+string renderSumType(SumTypeDef def, SumtypeOptions options)
 {
 	auto output = appender!string;
 
