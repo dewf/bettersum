@@ -20,3 +20,8 @@ string sumtype(string input, SumtypeOptions options = SumtypeOptions(), string f
 	// else some neutral failure, which shouldn't be possoble (parseSumType should always error)
 	return format("static assert(0, \"sumtype: bad format (file [%s], line %d)\");", file, line);
 }
+
+string sumtype(string input, NamingConvention nc, string file = __FILE__, size_t line = __LINE__) {
+	SumtypeOptions options = { namingConvention: nc };
+	return sumtype(input, options, file, line);
+}
