@@ -343,16 +343,16 @@ class Renderer : Visitor {
         output ~= prim;
     }
     override void namedThing(string name, DType[] typeArgs, bool typeArgsWithParens) {
-        import std.range: enumerate;
         output ~= name;
         if (typeArgs.length > 0) {
             output ~= "!";
             if (typeArgsWithParens) {
                 output ~= "(";
             }
-            foreach (i, ta; typeArgs.enumerate()) {
+            // std.range.enumerate was giving us weird issues, so just using a 'for' loop now
+            for (int i = 0; i < typeArgs.length; i++) {
                 if (i != 0) output ~= ",";
-                ta.visit(this);
+                typeArgs[i].visit(this);
             }
             if (typeArgsWithParens) {
                 output ~= ")";
