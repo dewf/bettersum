@@ -56,7 +56,7 @@ ParseResult!DType parseBracketed(DType prim, Token[] tokens) {
 
 	} else if (auto err = bracketResult.isError()) {
 		// raise bracket errors
-		return reraise!DType(err.message, err.loc);
+		return makeError!DType(err.message, err.loc);
 	}
 
 	// else no worries
@@ -86,7 +86,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 		return ParseResult!TypeArgsResult.makeSuccess(res, single.loc, single.etc);
 	} else if (auto err = singleTypeResult.isError()) {
 		// re-raise
-		return reraise!TypeArgsResult(err.message, err.loc);
+		return makeError!TypeArgsResult(err.message, err.loc);
 	} // else simple failure - try parenthesized parse instead
 
 	// else is it a parenthesized list?
@@ -124,7 +124,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 
 			} else if (auto err = typeResult.isError()) {
 				// raise type-parsing error
-				return reraise!TypeArgsResult(err.message, err.loc);
+				return makeError!TypeArgsResult(err.message, err.loc);
 			}
 
 			// else it's an error because we failed to parse a type (and didn't continue/exit first)
@@ -134,7 +134,7 @@ ParseResult!TypeArgsResult parseTypeArguments(Token[] tokens) {
 
 	} else if (auto err = parensResult.isError()) {
 		// raise error (requires conversion)
-		return reraise!TypeArgsResult(err.message, err.loc);
+		return makeError!TypeArgsResult(err.message, err.loc);
 	}
 	// no parens pair, fail gracefully
 	return ParseResult!TypeArgsResult.makeFail();
@@ -162,7 +162,7 @@ ParseResult!DType parseFront(Token[] tokens) {
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
-			return reraise!DType(err.message, err.loc);
+			return makeError!DType(err.message, err.loc);
 		}
 
 		// else no type args - no worries
@@ -226,7 +226,7 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 
 			} else if (auto err = typeResult.isError()) {
 				// type parsing error, re-raise
-				return reraise!(FunctionArg[])(err.message, err.loc);
+				return makeError!(FunctionArg[])(err.message, err.loc);
 			}
 
 			// else non-existent - error because it's required
@@ -237,7 +237,7 @@ ParseResult!(FunctionArg[]) parseFunctionArgs(Token[] tokens) {
 
 	} else if (auto err = contentResult.isError()) {
 		// re-raise badness (missing right paren or whatever)
-		reraise!(FunctionArg[])(err.message, err.loc);
+		return makeError!(FunctionArg[])(err.message, err.loc);
 	}
 
 	// else no parens (outside will make this an error)
@@ -304,7 +304,7 @@ ParseResult!DType parseCallable(DType returnType, Token[] tokens) {
 			return ParseResult!DType.makeSuccess(dt, args.loc, args.etc);
 
 		} else if (auto err = argsResult.isError()) {
-			return reraise!DType(err.message, err.loc);
+			return makeError!DType(err.message, err.loc);
 		} // else no args list found
 
 		// ... so it's an error, because the keyword MUST be followed by a parameter list
@@ -353,7 +353,7 @@ ParseResult!DType parseTypeSuffix(DType front, Location loc, Token[] tokens, Par
 			return parseTypeSuffix(dt, nested.loc, nested.etc, context);
 
 		} else if (auto err = nestedResult.isError()) {
-			return reraise!DType(err.message, err.loc);
+			return makeError!DType(err.message, err.loc);
 		}
 		// if dot existed, had to be followed with type
 		return ParseResult!DType.makeError("dot (.) not followed by type", dot.loc);
@@ -403,7 +403,7 @@ ParseResult!DType parseType(Token[] tokens, ParseTypeContext context = ParseType
 			return ParseResult!DType.makeError("typeof() content must be backticked D expression", content.loc);
 		}
 		 else if (auto err = contentResult.isError()) {
-			return reraise!DType(err.message, err.loc);
+			return makeError!DType(err.message, err.loc);
 		}
 
 		// else 'typeof' without paren content - also an error

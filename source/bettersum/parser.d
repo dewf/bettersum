@@ -18,7 +18,10 @@ SimpleResult!CommaOrEnd parseCommaOrEnd(Token[] input, Location loc) {
 		return SimpleResult!CommaOrEnd.makeSuccess(CommaOrEnd.End, loc, input);
 	}
 	if (auto sym = tryToken(input, 0, t => t.isSymbol())) {
-		return SimpleResult!CommaOrEnd.makeSuccess(CommaOrEnd.Comma, input[0].loc, input[1..$]);
+		if (*sym == Token.Symbol.Comma) {
+			return SimpleResult!CommaOrEnd.makeSuccess(CommaOrEnd.Comma, input[0].loc, input[1..$]);
+		}
+		// else not the right symbol, fall through
 	}
 	return SimpleResult!CommaOrEnd.makeFail();
 }
@@ -34,7 +37,6 @@ ParseResult!(CaseArg[]) parseCaseArgs(Token[] input, Location loc) {
 	Location lastLoc = loc;
 
 	while (input.length > 0) {
-
 		// type required on every iteration:
 		auto typeResult = parseType(input);
 		if (auto type = typeResult.isSuccess()) {
@@ -57,6 +59,7 @@ ParseResult!(CaseArg[]) parseCaseArgs(Token[] input, Location loc) {
 			// no name, no worries - check for comma and continue
 			auto commaOrEndResult = parseCommaOrEnd(input, lastLoc);
 			if (auto commaOrEnd = commaOrEndResult.isSuccess()) {
+
 				// good to go another cycle (or might terminate if at end of input)
 				input = commaOrEnd.etc;
 				lastLoc = commaOrEnd.loc;
@@ -67,7 +70,7 @@ ParseResult!(CaseArg[]) parseCaseArgs(Token[] input, Location loc) {
 			}
 
 		} else if (auto err = typeResult.isError()) {
-			return reraise!(CaseArg[])(err.message, err.loc);
+			return makeError!(CaseArg[])(err.message, err.loc);
 		}
 
 		// iteration failed to parse a type where expected - this is an error
@@ -78,6 +81,7 @@ ParseResult!(CaseArg[]) parseCaseArgs(Token[] input, Location loc) {
 		// we allow 0-length params, just to be nice
 		return ParseResult!(CaseArg[]).makeSuccess(params, lastLoc, input);
 	}
+
 	// should be unreachable
 	return ParseResult!(CaseArg[]).makeError("parseCaseArgs: should be unreachable", lastLoc);
 }
@@ -136,14 +140,14 @@ ParseResult!Case parseCase(Token[] input) {
 				}
 
 			} else if (auto err = argsResult.isError()) {
-				return reraise!Case(err.message, err.loc);
+				return makeError!Case(err.message, err.loc);
 			}
 
 			// should be unreachable, but ...
 			return ParseResult!Case.makeError("parseCase: unknown case args parse issue - please report!", content.loc);
 
 		} else if (auto err = contentResult.isError()) {
-			return reraise!Case(err.message, err.loc);
+			return makeError!Case(err.message, err.loc);
 		}
 
 		// else nope, just a name
@@ -175,7 +179,7 @@ ParseResult!(Case[]) parseCases(Token[] input, Location loc) {
 				return ParseResult!(Case[]).makeError("missing comma/block end after case", case_.loc);
 			}
 		} else if (auto err = caseResult.isError()) {
-			reraise!(Case[])(err.message, err.loc);
+			return makeError!(Case[])(err.message, err.loc);
 		}
 		// else failed to parse a case - fall through to below (kinda seems like it should be an error, though)
 	}
@@ -253,12 +257,16 @@ ParseResult!SumTypeDef parseSumType(string definition) {
 
 			auto casesResult = parseCases(bracesContent.thing, bracesContent.loc);
 			if (auto cases = casesResult.isSuccess()) {
+
 				auto def = SumTypeDef(name.thing, typeParams, cases.thing);
 				return ParseResult!SumTypeDef.makeSuccess(def, cases.loc, bracesContent.etc); // beyond right brace
+
+			} else if (auto err = casesResult.isError()) {
+				return makeError!SumTypeDef(err.message, err.loc);
 			}
 
 		} else if (auto err = bracesContentResult.isError()) {
-			reraise!SumTypeDef(err.message, err.loc);
+			return makeError!SumTypeDef(err.message, err.loc);
 		}
 		// else failed to parse braces content, which is required
 		return ParseResult!SumTypeDef.makeError("missing braced { cases } for sumtype", lastLoc);

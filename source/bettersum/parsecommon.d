@@ -21,7 +21,7 @@ SimpleResult(T) {
 }
 }));
 
-ParseResult!T reraise(T)(string message, Location loc) {
+ParseResult!T makeError(T)(string message, Location loc) {
 	return ParseResult!T.makeError(message, loc);
 }
 
