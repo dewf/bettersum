@@ -5,9 +5,9 @@ import bettersum: sumtype;
 
 mixin(sumtype(q{
 Wondrous {
-	Thing1,
-	Thing2(int[] x),
-	Thing3(string)
+	Thing1,           // comment 1
+	Thing2(int[] x),  // comment 2
+	Thing3(string)    // comment 3
 }
 }));
 	// broken!!!

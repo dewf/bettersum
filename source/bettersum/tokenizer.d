@@ -3,6 +3,8 @@ module bettersum.tokenizer;
 import bettersum.lexer;
 import bettersum.util;
 
+import stonesoup.sumtype: sumtype;
+
 private:
 
 immutable auto knownKeywords = setFromItems!string([
@@ -104,7 +106,19 @@ bool isBackticked(string str) {
 	return str[0] == '`' && str[$-1] == '`';
 }
 
-Token[] classify(Chunk[] chunks) {
+bool isComment(string str) {
+	import std.string: startsWith;
+	return str.startsWith("//");
+}
+
+mixin(sumtype(q{
+TokenResult {
+	Success(`Token[]`),
+	Error(`string` message, `Location` loc)
+}
+}));
+
+TokenResult classify(Chunk[] chunks) {
 	Token[] result;
 	foreach (ch; chunks) {
 		Token.Symbol sym;
@@ -120,12 +134,14 @@ Token[] classify(Chunk[] chunks) {
 			result ~= Token.mkIdentifier(ch);
 		} else if (isBackticked(ch.str)) {
 			result ~= Token.mkBackticked(ch);
+		} else if (isComment(ch.str)) {
+			// ignore it!
 		}
 		else {
-			throw new Exception("could not classify lexed chunk: [" ~ ch.str ~ "]");
+			return TokenResult.makeError("could not classify lexed chunk: [" ~ ch.str ~ "]", Location(ch.line, ch.col));
 		}
 	}
-	return result;
+	return TokenResult.makeSuccess(result);
 }
 
 public:
@@ -263,6 +279,15 @@ struct Token {
 	}
 }
 
-Token[] tokenize(string input) {
-    return classify(chunkify(input));
+TokenResult tokenize(string input) {
+	auto chunksResult = chunkify(input);
+	if (auto chunks = chunksResult.isSuccess()) {
+		return classify(*chunks);
+	} else if (auto err = chunksResult.isError()) {
+		// re-raise
+		return TokenResult.makeError(err.message, Location(err.line, err.col));
+	}
+	static assert(TokenResult.isExhaustive(q{Success, Error}));
+	// unreachable
+	assert(0);
 }

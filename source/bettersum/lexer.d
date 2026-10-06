@@ -1,9 +1,26 @@
 module bettersum.lexer;
 
 import bettersum.util;
+
 import stonesoup.unit: Unit;
+import stonesoup.sumtype: sumtype;
 
 private:
+
+bool comment(string input, out string value) {
+	import std.string: startsWith;
+	if (input.length < 2) return false;
+	if (input.startsWith("//")) {
+		int i = 2;
+		while (i < input.length) {
+			if (input[i] == '\n') break;
+			i++;
+		}
+		value = input[0..i];
+		return true;
+	}
+	return false;
+}
 
 bool backticked(string input, out string value) {
 	if (input.length < 2) return false;
@@ -103,7 +120,14 @@ struct Chunk {
 	int col;
 }
 
-Chunk[] chunkify(string input) {
+mixin(sumtype(q{
+ChunkResult{
+	Success(`Chunk[]`),
+	Error(`string` message, `int` line, `int` col)
+}
+}));
+
+ChunkResult chunkify(string input) {
 	Chunk[] output;
 	int line;
 	int col;
@@ -111,7 +135,11 @@ Chunk[] chunkify(string input) {
 	PosDelta delta;
 	size_t i;
 	while (i < input.length) {
-		if (backticked(input[i..$], current)) {
+		if (comment(input[i..$], current)) {
+			output ~= Chunk(current, line, col);
+			col += current.length;
+			i += current.length;
+		} else if (backticked(input[i..$], current)) {
 			output ~= Chunk(current, line, col);
 			col += current.length;
 			i += current.length;
@@ -131,8 +159,8 @@ Chunk[] chunkify(string input) {
 			col += delta.cols;
 			i += current.length;
 		} else {
-			throw new Exception("unhandle-able character: " ~ input[i]);
+			return ChunkResult.makeError("lexer failure", line, col);
 		}
 	}
-	return output;
+	return ChunkResult.makeSuccess(output);
 }

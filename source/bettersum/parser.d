@@ -221,7 +221,13 @@ ParseResult!(string[]) parseTypeParams(Token[] input, Location loc) {
 }
 
 ParseResult!SumTypeDef parseSumType(string definition) {
-	auto tokens = tokenize(definition);
+	auto tokenResult = tokenize(definition);
+	if (auto err = tokenResult.isError()) {
+		// re-raise
+		return ParseResult!SumTypeDef.makeError(err.message, err.loc);
+	}
+	// else OK
+	auto tokens = tokenResult.success();
 	Location lastLoc;
 
 	auto nameResult = parseIdentifier(tokens);
