@@ -3,8 +3,6 @@ module bettersum.tokenizer;
 import bettersum.lexer;
 import bettersum.util;
 
-import stonesoup.sumtype: sumtype;
-
 private:
 
 immutable auto knownKeywords = setFromItems!string([
@@ -111,12 +109,53 @@ bool isComment(string str) {
 	return str.startsWith("//");
 }
 
-mixin(sumtype(q{
-TokenResult {
-	Success(`Token[]`),
-	Error(`string` message, `Location` loc)
+struct TokenResult {
+	import std.exception: enforce;
+
+	enum Tag { Success, Error }
+	struct Error { string message; Location loc; }
+	union Content {
+		Token[] success;
+		Error error;
+	}
+	Tag tag;
+	Content content;
+
+	static TokenResult makeSuccess(Token[] tokens) {
+		Content c = { success: tokens };
+		return TokenResult(Tag.Success, c);
+	}
+	Token[]* isSuccess() {
+		if (tag == Tag.Success) {
+			return &content.success;
+		}
+		return null;
+	}
+	Token[] success() {
+		enforce(tag == Tag.Success, "TokenResult: tried to access success value, in error state");
+		return content.success;
+	}
+
+	static TokenResult makeError(string message, Location loc) {
+		Content c = { error: Error(message, loc) };
+		return TokenResult(Tag.Error, c);
+	}
+	Error* isError() {
+		if (tag == Tag.Error) {
+			return &content.error;
+		}
+		return null;
+	}
+
+	static bool isExhaustive(string caseNames)
+    {
+        import std.string: split;
+        import std.algorithm.sorting: sort;
+        auto inputCases = caseNames.split(", ").sort();
+        auto checkAgainst = ["Success", "Error"].sort();
+        return inputCases == checkAgainst;
+    }
 }
-}));
 
 TokenResult classify(Chunk[] chunks) {
 	Token[] result;

@@ -5,9 +5,6 @@ import bettersum.parsecommon;
 import bettersum.typeparser;
 import bettersum.dtype;
 
-// TODO: remove
-import stonesoup.sumtype: sumtype;
-
 enum CommaOrEnd {
 	Comma,
 	End
@@ -86,13 +83,66 @@ ParseResult!(CaseArg[]) parseCaseArgs(Token[] input, Location loc) {
 	return ParseResult!(CaseArg[]).makeError("parseCaseArgs: should be unreachable", lastLoc);
 }
 
-mixin(sumtype(q{
-CasePayload {
-	NameOnly,
-	SingleType(`DType`),
-	NamedArgs(`CaseArg[]`)
+struct CasePayload {
+private:
+	union Content {
+		// NameOnly is name-only :)
+		DType singleType;
+		CaseArg[] namedArgs;
+	}
+	Tag _tag;
+	Content content;
+public:
+	enum Tag { NameOnly, SingleType, NamedArgs }
+	Tag tag() => _tag;
+
+	static CasePayload makeNameOnly() {
+		return CasePayload(Tag.NameOnly, Content());
+	}
+	bool isNameOnly() {
+		return _tag == Tag.NameOnly;
+	}
+
+	static CasePayload makeSingleType(DType value) {
+		Content c = { singleType: value };
+		return CasePayload(Tag.SingleType, c);
+	}
+	DType* isSingleType() {
+		if (_tag == Tag.SingleType) {
+			return &content.singleType;
+		}
+		return null;
+	}
+
+	static CasePayload makeNamedArgs(CaseArg[] value) {
+		Content c = { namedArgs: value };
+		return CasePayload(Tag.NamedArgs, c);
+	}
+	CaseArg[]* isNamedArgs() {
+		if (_tag == Tag.NamedArgs) {
+			return &content.namedArgs;
+		}
+		return null;
+	}
+
+	struct _NameOnly {}
+	T match(T)(
+		T delegate(ref _NameOnly) nameOnlyFunc,
+		T delegate(ref DType) singleTypeFunc,
+		T delegate(ref CaseArg[]) namedArgsFunc)
+	{
+		_NameOnly fake;
+		with (Tag)
+		final switch (_tag) {
+			case NameOnly:
+				return nameOnlyFunc(fake);
+			case SingleType:
+				return singleTypeFunc(content.singleType);
+			case NamedArgs:
+				return namedArgsFunc(content.namedArgs);
+		}
+	}
 }
-}));
 
 struct Case {
 	string name;

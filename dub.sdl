@@ -5,5 +5,3 @@ copyright "Copyright © 2026, Daniel"
 license "proprietary"
 
 targetPath "./bin"
-
-dependency "stonesoup" path="R:/projects/dlang/stonesoup"

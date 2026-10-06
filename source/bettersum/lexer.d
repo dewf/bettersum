@@ -2,9 +2,6 @@ module bettersum.lexer;
 
 import bettersum.util;
 
-import stonesoup.unit: Unit;
-import stonesoup.sumtype: sumtype;
-
 private:
 
 bool comment(string input, out string value) {
@@ -120,12 +117,38 @@ struct Chunk {
 	int col;
 }
 
-mixin(sumtype(q{
-ChunkResult{
-	Success(`Chunk[]`),
-	Error(`string` message, `int` line, `int` col)
+struct ChunkResult {
+	enum Tag { Success, Error };
+	struct Error { string message; int line; int col; }
+	union Content {
+		Chunk[] success;
+		Error error;
+	}
+	Tag tag;
+	Content content;
+
+	static makeSuccess(Chunk[] chunks) {
+		Content c = { success: chunks };
+		return ChunkResult(Tag.Success, c);
+	}
+	Chunk[]* isSuccess() {
+		if (tag == Tag.Success) {
+			return &content.success;
+		}
+		return null;
+	}
+
+	static makeError(string message, int line, int col) {
+		Content c = { error: Error(message, line, col) };
+		return ChunkResult(Tag.Error, c);
+	}
+	Error* isError() {
+		if (tag == Tag.Error) {
+			return &content.error;
+		}
+		return null;
+	}
 }
-}));
 
 ChunkResult chunkify(string input) {
 	Chunk[] output;

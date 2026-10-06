@@ -1,25 +1,86 @@
 module bettersum.parsecommon;
 
 import bettersum.tokenizer;
+import bettersum.unit;
 
-// TODO: remove
-import stonesoup.unit;
-import stonesoup.sumtype;
+struct ParseResult(T) {
+	import std.exception: enforce;
+	enum Tag { Success, Fail, Error }
+	struct Success { T thing; Location loc; Token[] etc; }
+	// fail is name-only
+	struct Error { string message; Location loc; }
+	union Content {
+		Success success;
+		// fail is name-only
+		Error error;
+	}
+	Tag tag;
+	Content content;
 
-mixin(sumtype(q{
-ParseResult(T) {
-	Success(`T` thing, `Location` loc, `Token[]` etc),
-	Fail,
-	Error(`string` message, `Location` loc)
+	static ParseResult makeSuccess(T thing, Location loc, Token[] etc) {
+		Content c = { success: Success(thing, loc, etc) };
+		return ParseResult(Tag.Success, c);
+	}
+	Success* isSuccess() {
+		if (tag == Tag.Success){
+			return &content.success;
+		}
+		return null;
+	}
+
+	static ParseResult makeFail() {
+		return ParseResult(Tag.Fail, Content());
+	}
+	bool isFail() {
+		return tag == Tag.Fail;
+	}
+
+	static ParseResult makeError(string message, Location loc) {
+		Content c = { error: Error(message, loc) };
+		return ParseResult(Tag.Error, c);
+	}
+	Error* isError() {
+		if (tag == Tag.Error) {
+			return &content.error;
+		}
+		return null;
+	}
 }
-}));
 
-mixin(sumtype(q{
-SimpleResult(T) {
-	Success(`T` thing, `Location` loc, `Token[]` etc),
-	Fail
+struct SimpleResult(T) {
+	import std.exception: enforce;
+	enum Tag { Success, Fail }
+	struct Success { T thing; Location loc; Token[] etc; }
+	union Content {
+		Success success;
+		// fail is name-only
+	}
+	Tag tag;
+	Content content;
+
+	static SimpleResult makeSuccess(T thing, Location loc, Token[] etc) {
+		Content c = { success: Success(thing, loc, etc) };
+		return SimpleResult(Tag.Success, c);
+	}
+	Success* isSuccess() {
+		if (tag == Tag.Success) {
+			return &content.success;
+		}
+		return null;
+	}
+	ref Success success() {
+		enforce(tag == Tag.Success, "SimpleResult(T): accessed 'success' in a non-success state");
+		return content.success;
+	}
+
+	static SimpleResult makeFail() {
+		return SimpleResult(Tag.Fail, Content());
+	}
+	bool isFail() {
+		return tag == Tag.Fail;
+	}
 }
-}));
+
 
 ParseResult!T makeError(T)(string message, Location loc) {
 	return ParseResult!T.makeError(message, loc);
