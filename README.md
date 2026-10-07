@@ -67,10 +67,12 @@ void main()
 		writefln("blue(%s)", *blue);
 
 	} else {
-		// etc - handle all other cases (you'll have to use .get<Case> getters if you need something specific)
+		// etc - handle all other cases
+		// (you'll have to use .get<Case> getters if you need something specific)
 	}
 
-	// a manual checksum of sorts: put this after any if-style match, to indicate all the cases you handled
+	// a manual checksum of sorts: put this after any if-style match,
+	//   to indicate all the cases you handled.
 	// if a new one gets added later, it will fail to compile
 	static assert(BetterThing.isExhaustive(q{Red, Green, Blue, Yellow, Orange}));
 
