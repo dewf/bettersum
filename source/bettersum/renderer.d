@@ -252,10 +252,10 @@ string renderSumType(ref SumTypeDef def, ref SumtypeOptions options)
 				(auto singleType) => singleType.renderToString() ~ " value",
 				(auto namedArgs) => namedArgs.map!(arg => arg.type.renderToString() ~ " " ~ arg.name).join(", ")
 			);
-		output ~= "        _MatchResult " ~ caseFuncName(c, namingConvention) ~ "(" ~ args ~ ") => any();\n";
+		output ~= "        _MatchResult " ~ caseFuncName(c, namingConvention) ~ "(" ~ args ~ ") => _any();\n";
 	}
-	output ~= "        _MatchResult any() {\n";
-	output ~= "            throw new Exception(\"" ~ sumTypeName(def) ~ ".Matcher.any() called, but not implemented\");\n";
+	output ~= "        _MatchResult _any() {\n";
+	output ~= "            throw new Exception(\"" ~ sumTypeName(def) ~ ".Matcher._any() called, but not implemented\");\n";
 	output ~= "        }\n";
 	output ~= "    }\n"; // end Matcher base class
 
