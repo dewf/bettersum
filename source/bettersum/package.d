@@ -14,7 +14,7 @@ string sumtype(string input, SumtypeOptions options = SumtypeOptions(), string f
 		return renderSumType(def.thing, options);
 
 	} else if (auto err = result.isError()) {
-		return format("static assert(0, \"sumtype (file [%s], line %d): %s %s\");", file, line, err.message, err.loc);
+		return format("static assert(0, \"sumtype (file [%s]%s): %s\");", file, err.loc.plusLines(line), err.message);
 	}
 
 	// else some neutral failure, which shouldn't be possoble (parseSumType should always error)

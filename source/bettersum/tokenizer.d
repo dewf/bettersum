@@ -201,7 +201,10 @@ struct Location {
 		return format("[%d:%d]", line, col);
 	}
 	Location plusCols(ulong cols) {
-		return Location(line, col + cast(int) cols);
+		return Location(line, col + cast(int)cols);
+	}
+	Location plusLines(ulong lines) {
+		return Location(line + cast(int)lines, col);
 	}
 }
 
