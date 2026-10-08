@@ -18,7 +18,7 @@ CoolThing(T) {
     Yellow(T),               // same
     Orange(int x, string y)  // multi-field payload
 
-	// Zebra(int, int int)   // tuple-style payload, not supported
+	// Zebra(int, int, int)   // tuple-style payload, not supported
 }}));
 
 alias BetterThing = CoolThing!float;
@@ -82,10 +82,10 @@ void main()
 	}
 
 	// string-based testing (note this is a compile-time argument)
-	if (thing.isOneOf!(q{Red, Blue})) {
+	if (thing.isOneOf!q{Red, Blue}) {
 	}
 
-	// simple expression-style matching:
+	// simple delegate-style matching:
 	// all cases must be handled, in order
 	auto result =
 		thing.match!string(
@@ -96,18 +96,22 @@ void main()
 			(auto orange) => format("orange(%d, %s)", orange.x, orange.y)
 		);
 
-	// fancier visitor-style matching, only handle what you care about
+	// more flexible visitor-style matching
 	auto result2 =
 		thing.match(
 			new class BetterThing.Matcher!int {
+				// only handle what you care about
 				override int red() => 1;
 				override int green(int x) => 2;
-				override int blue(string value) => 3;
-				override int yellow(float value) => 4;
-				override int orange(int x, string y) => 5;
 
-				// default handler, for anything you don't override:
+				// default handler, for anything you don't override
+				// MUST be implemented if you don't handle all cases
 				override int _any() => 100;
+
+				// our default handler will catch these:
+				// override int blue(string value) => ... ;
+				// override int yellow(float value) => ... ;
+				// override int orange(int x, string y) => ... ;
 			}
 		);
 }
