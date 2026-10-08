@@ -1,6 +1,8 @@
 # bettersum
 mixin-based sumtypes for D
 
+(Use the companion project [sumgen](https://github.com/dewf/sumgen) if you'd prefer to insert the generated code directly into .d files)
+
 example usage:
 
 ```d
@@ -115,12 +117,12 @@ void main()
 			}
 		);
 
-	// hybrid "if-style expression"
+	// hybrid "if-style expression" style
 	auto result3 = () {
 		if (thing.isRed()) {
 			return "red";
 		} else if (auto green = thing.isGreen()) {
-			return "green";
+			return format("green: %d", green.x);
 		} else {
 			return "other";
 		}
