@@ -114,5 +114,16 @@ void main()
 				// override int orange(int x, string y) => ... ;
 			}
 		);
+
+	// hybrid "if-style expression"
+	auto result3 = () {
+		if (thing.isRed()) {
+			return "red";
+		} else if (auto green = thing.isGreen()) {
+			return "green";
+		} else {
+			return "other";
+		}
+	}();
 }
 ```
