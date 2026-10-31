@@ -135,17 +135,17 @@ string renderSumType(ref SumTypeDef def, ref SumtypeOptions options)
 		output ~= "    static " ~ sumTypeName(def) ~ " " ~ caseSpecName(c) ~ "(" ~ ctorParams ~ ") {\n";
 
 		if (c.payload.isNameOnly()) {
-			output ~= "        Content c;\n";
+			output ~= "        Content _content;\n";
 
 		} else if (auto singleType = c.payload.isSingleType()) {
-			output ~= "        Content c = { " ~ caseFieldName(c, namingConvention) ~ ": value };\n";
+			output ~= "        Content _content = { " ~ caseFieldName(c, namingConvention) ~ ": value };\n";
 
 		} else if (auto namedArgs = c.payload.isNamedArgs()) {
 			auto fieldNames = (*namedArgs).map!(arg => arg.name).join(", ");
-			output ~= "        Content c = { " ~ caseFieldName(c, namingConvention) ~ ": " ~ caseContentType(c, namingConvention) ~ "(" ~ fieldNames ~ ") };\n";
+			output ~= "        Content _content = { " ~ caseFieldName(c, namingConvention) ~ ": " ~ caseContentType(c, namingConvention) ~ "(" ~ fieldNames ~ ") };\n";
 		}
 
-		output ~= "        return " ~ sumTypeName(def) ~ "(Tag." ~ caseTagName(c, namingConvention) ~ ", c);\n";
+		output ~= "        return " ~ sumTypeName(def) ~ "(Tag." ~ caseTagName(c, namingConvention) ~ ", _content);\n";
 		output ~= "    }\n";
 
 		final switch (c.payload.tag()) with (CasePayload) {
